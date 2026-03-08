@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RetailTrend — Dashboard</title>
+  <meta name="description" content="RetailTrend SaaS analytics dashboard — track products, sales, market trends, and demand forecasts."/>
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>"/>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body class="dashboard-layout" style="display:none;">
+
+<!-- ============================================================
+     SIDEBAR NAVIGATION
+============================================================ -->
+<aside class="sidebar" id="sidebar">
+  <!-- Logo -->
+  <div class="sidebar-logo">
+    <div class="logo-icon">📈</div>
+    <div>
+      <div class="logo-text">RetailTrend</div>
+      <div class="logo-sub">Analytics Platform</div>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="sidebar-nav">
+    <div class="sidebar-section-label">Main Menu</div>
+
+    <!-- Dashboard -->
+    <button class="nav-item active" onclick="showSection('dashboard')" id="nav-dashboard">
+      <span class="nav-icon">🏠</span>
+      Dashboard
+    </button>
+
+    <!-- Products -->
+    <button class="nav-item" onclick="showSection('products')" id="nav-products">
+      <span class="nav-icon">📦</span>
+      Products
+    </button>
+
+    <!-- Sales Analytics -->
+    <button class="nav-item" onclick="showSection('analytics')" id="nav-analytics">
+      <span class="nav-icon">📊</span>
+      Sales Analytics
+    </button>
+
+    <!-- Market Trends -->
+    <button class="nav-item" onclick="showSection('market')" id="nav-market">
+      <span class="nav-icon">🌐</span>
+      Market Trends
+    </button>
+
+    <!-- AI Assistant -->
+    <button class="nav-item" onclick="showSection('ai')" id="nav-ai">
+      <span class="nav-icon">🤖</span>
+      AI Assistant
+    </button>
+
+    <div class="sidebar-section-label" style="margin-top:16px;">Settings</div>
+
+    <!-- Logout -->
+    <button class="nav-item logout-btn" onclick="logoutUser()" id="nav-logout">
+      <span class="nav-icon">🚪</span>
+      Logout
+    </button>
+  </nav>
+
+  <!-- Sidebar Footer — user info -->
+  <div class="sidebar-footer">
+    <div class="sidebar-user">
+      <div class="user-avatar" id="sidebar-avatar">U</div>
+      <div class="user-info">
+        <div class="user-name" id="sidebar-name">Guest User</div>
+        <div class="user-role">Store Manager</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- ============================================================
+     MAIN CONTENT AREA
+============================================================ -->
+<div class="main-content">
+
+  <!-- ====== TOP NAVBAR ====== -->
+  <header class="top-navbar">
+    <div class="navbar-left">
+      <div class="page-title" id="navbar-title">Dashboard</div>
+      <div class="page-subtitle" id="navbar-subtitle">Overview &amp; Sales Analytics</div>
+    </div>
+    <div class="navbar-right">
+      <div class="navbar-badge">
+        👤 <span id="navbar-username">Guest</span>
+      </div>
+      <button class="navbar-logout-btn" onclick="logoutUser()">
+        🚪 Logout
+      </button>
+    </div>
+  </header>
+
+  <!-- ====== PAGE CONTENT ====== -->
+  <div class="page-content">
+
+    <!-- =================================================================
+         SECTION 1: DASHBOARD (Overview)
+    ================================================================= -->
+    <section class="content-section active" id="section-dashboard">
+
+      <div class="card" style="margin-top:20px;">
+  	<div class="card-header">
+	  <div class="card-title">🧠 AI Store Insights</div>
+        </div>
+
+        <div class="card-body">
+          <div id="ai-insights">
+            Generating AI insights...
+          </div>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <div class="section-title">
+          Dashboard Overview
+          <span>Real-time summary of your store performance</span>
+        </div>
+        <button class="btn-pill" onclick="refreshDashboard()">↻ Refresh</button>
+        <button class="btn-pill" onclick="exportReport()">📄 Export Report</button>
+      </div>
+
+      <!-- Stats Cards -->
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card blue">
+          <div class="stat-icon">📦</div>
+          <div class="stat-info">
+            <div class="stat-label">Total Products</div>
+            <div class="stat-value" id="stat-total-products">0</div>
+            <div class="stat-change">↑ Tracked in store</div>
+          </div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-icon">💰</div>
+          <div class="stat-info">
+            <div class="stat-label">Total Sales</div>
+            <div class="stat-value" id="stat-total-sales">0</div>
+            <div class="stat-change">↑ Units sold</div>
+          </div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-icon">🏆</div>
+          <div class="stat-info">
+            <div class="stat-label">Best Selling Product</div>
+            <div class="stat-value" style="font-size:1rem;" id="stat-best-product">—</div>
+            <div class="stat-change">Top performer</div>
+          </div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-icon">🏷️</div>
+          <div class="stat-info">
+            <div class="stat-label">Top Category</div>
+            <div class="stat-value" style="font-size:1rem;" id="stat-top-category">—</div>
+            <div class="stat-change">Highest sales volume</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Chart Preview (mini line) -->
+      <div class="cards-grid">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📈 Sales Trend (Quick View)</div>
+          </div>
+          <div class="card-body">
+            <div class="chart-wrapper" style="height:220px;">
+              <canvas id="dashMiniChart"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🥧 Category Split</div>
+          </div>
+          <div class="card-body">
+            <div class="chart-wrapper" style="height:220px;">
+              <canvas id="dashPieChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Market Insights Quick Row -->
+      <div class="card">
+  		 <div class="card-header">
+    		  <div class="card-title">🏆 Top Products</div>
+  	          </div>
+                 <div class="card-body">
+    		  <ul id="top-products-list"></ul>
+                 </div>
+              </div>
+      <div class="section-header" style="margin-top: 8px;">
+        <div class="section-title">Market Insights <span>Auto-analyzed from your product data</span></div>
+      </div>
+      <div class="insights-grid" id="insights-grid">
+        <div class="insight-card">
+          <div class="insight-emoji">🔥</div>
+          <div class="insight-label">Trending Product</div>
+          <div class="insight-value" id="insight-trending">—</div>
+        </div>
+        <div class="insight-card">
+          <div class="insight-emoji">🚀</div>
+          <div class="insight-label">Fastest Growing Category</div>
+          <div class="insight-value" id="insight-growing">—</div>
+        </div>
+        <div class="insight-card">
+          <div class="insight-emoji">🏅</div>
+          <div class="insight-label">Top Selling Product</div>
+          <div class="insight-value" id="insight-top">—</div>
+        </div>
+        <div class="insight-card">
+          <div class="insight-emoji">📊</div>
+          <div class="insight-label">Total Sales Count</div>
+          <div class="insight-value" id="insight-total-sales">0</div>
+        </div>
+      </div>
+
+    </section><!-- /#section-dashboard -->
+
+
+    <!-- =================================================================
+         SECTION 2: PRODUCTS
+    ================================================================= -->
+    <section class="content-section" id="section-products">
+
+      <div class="section-header">
+        <div class="section-title">
+          Product Management
+          <span>Add and track your product sales data</span>
+        </div>
+      </div>
+
+      <!-- Add Product Form -->
+      <div class="add-product-form">
+        <h3>➕ Add New Product Entry</h3>
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="prod-name">Product Name</label>
+            <input type="text" id="prod-name" placeholder="e.g. iPhone 15 Pro"/>
+          </div>
+          <div class="form-field">
+            <label for="prod-category">Category</label>
+            <select id="prod-category">
+              <option value="">Select category...</option>
+              <option value="Electronics">Electronics</option>
+              <option value="Clothing">Clothing</option>
+              <option value="Accessories">Accessories</option>
+              <option value="Home & Living">Home &amp; Living</option>
+              <option value="Beauty">Beauty</option>
+              <option value="Sports">Sports</option>
+              <option value="Books">Books</option>
+              <option value="Food & Beverage">Food &amp; Beverage</option>
+              <option value="Toys">Toys</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="prod-sales">Sales Count</label>
+            <input type="number" id="prod-sales" placeholder="e.g. 150" min="0"/>
+          </div>
+          <div class="form-field">
+            <label for="prod-date">Date</label>
+            <input type="date" id="prod-date"/>
+          </div>
+        </div>
+        <button class="btn-add" onclick="addProduct()">
+          ➕ Add Product
+        </button>
+        <div id="product-msg" style="display:none;"></div>
+      </div>
+
+      <!-- Product Table -->
+      <div class="table-container">
+        <div class="table-header">
+          <div class="table-title">📋 Product Records <span class="badge-count" id="product-count">0</span></div>
+          <button class="btn-pill" onclick="clearProducts()" style="color:#ef4444; border-color:#fecaca; background:#fff0f0;">
+            🗑 Clear All
+          </button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Product Name</th>
+                <th>Category</th>
+                <th>Sales</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody id="product-table-body">
+              <tr>
+                <td colspan="5">
+                  <div class="empty-state">
+                    <div class="empty-icon">📦</div>
+                    <p>No products added yet. Use the form above to add your first product!</p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section><!-- /#section-products -->
+
+
+    <!-- =================================================================
+         SECTION 3: SALES ANALYTICS
+    ================================================================= -->
+    <section class="content-section" id="section-analytics">
+
+      <div class="section-header">
+        <div class="section-title">
+          Sales Analytics
+          <span>Visual breakdowns of your product performance</span>
+        </div>
+        <button class="btn-pill" onclick="refreshCharts()">↻ Refresh Charts</button>
+      </div>
+
+      <!-- Line Chart — Sales Trend -->
+      <div class="chart-card" style="margin-bottom:24px;">
+        <h3>📈 Sales Trend Over Time</h3>
+        <div class="chart-wrapper">
+          <canvas id="salesTrendChart"></canvas>
+        </div>
+      </div>
+      <div class="chart-card" style="margin-top:24px;">
+  		    <h3>📅 Monthly Sales Performance</h3>
+  		  <div class="chart-wrapper">
+   			 <canvas id="monthlySalesChart"></canvas>
+  		  </div>
+      </div>
+      <!-- Pie + Bar side by side -->
+      <div class="chart-row">
+        <div class="chart-card">
+          <h3>🥧 Category Distribution</h3>
+          <div class="chart-wrapper">
+            <canvas id="categoryPieChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h3>📊 Product Performance</h3>
+          <div class="chart-wrapper">
+            <canvas id="productBarChart"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="chart-card">
+                 <h3>📊 Category Growth</h3>
+                 <div class="chart-wrapper">
+                    <canvas id="categoryGrowthChart"></canvas>
+                 </div>
+               </div>
+
+    </section><!-- /#section-analytics -->
+
+
+    <!-- =================================================================
+         SECTION 4: MARKET TRENDS (FakeStoreAPI + Demand Forecast)
+    ================================================================= -->
+    <section class="content-section" id="section-market">
+
+      <div class="section-header">
+        <div class="section-title">
+          Market Trends
+          <span>Live data from real product APIs + demand forecasts</span>
+        </div>
+        <button class="btn-pill" onclick="fetchMarketTrends()">↻ Reload</button>
+      </div>
+
+      <!-- Real Market Trends from API -->
+      <div class="section-header" style="margin-bottom:14px;">
+        <div class="section-title" style="font-size:1rem;">🌐 Top 5 Trending Products (Live API)</div>
+      </div>
+      <div class="market-grid" id="market-grid">
+        <!-- Cards injected by JS -->
+        <div style="grid-column:1/-1; text-align:center; padding:24px; color:#94a3b8;">
+          <div class="spinner" style="margin:0 auto 12px;"></div>
+          Loading market trends...
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Demand Forecast Engine -->
+      <div class="section-header" style="margin-bottom:14px;">
+        <div class="section-title" style="font-size:1rem;">🔮 Demand Forecast Engine</div>
+      </div>
+
+      <!-- Predicted demand stat -->
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:18px; margin-bottom:24px;">
+        <div class="forecast-stat">
+          <div class="forecast-label">Predicted Demand Next Week</div>
+          <div class="forecast-next-week" id="forecast-next-week">—</div>
+          <div class="text-muted">estimated units</div>
+        </div>
+        <div class="forecast-stat">
+          <div class="forecast-label">High Demand Products</div>
+          <div class="forecast-next-week" id="forecast-high-count" style="color:#ef4444;">0</div>
+          <div class="text-muted" style="color:#ef4444;">needs restocking</div>
+        </div>
+        <div class="forecast-stat">
+          <div class="forecast-label">Medium Demand Products</div>
+          <div class="forecast-next-week" id="forecast-med-count" style="color:#f59e0b;">0</div>
+          <div class="text-muted" style="color:#f59e0b;">monitor closely</div>
+        </div>
+        <div class="forecast-stat">
+          <div class="forecast-label">Low Demand Products</div>
+          <div class="forecast-next-week" id="forecast-low-count" style="color:#10b981;">0</div>
+          <div class="text-muted" style="color:#10b981;">stable stock</div>
+        </div>
+      </div>
+
+      <!-- Demand classification cards -->
+      <div class="forecast-grid" id="forecast-grid">
+        <div class="forecast-card demand-high">
+          <div class="forecast-header">
+            <div class="forecast-dot"></div>
+            <div class="forecast-title">🔴 High Demand Products</div>
+          </div>
+          <ul class="forecast-list" id="forecast-high-list">
+            <li style="color:#94a3b8; font-size:0.82rem;">No products yet</li>
+          </ul>
+        </div>
+        <div class="forecast-card demand-medium">
+          <div class="forecast-header">
+            <div class="forecast-dot"></div>
+            <div class="forecast-title">🟡 Medium Demand Products</div>
+          </div>
+          <ul class="forecast-list" id="forecast-med-list">
+            <li style="color:#94a3b8; font-size:0.82rem;">No products yet</li>
+          </ul>
+        </div>
+        <div class="forecast-card demand-low">
+          <div class="forecast-header">
+            <div class="forecast-dot"></div>
+            <div class="forecast-title">🟢 Low Demand Products</div>
+          </div>
+          <ul class="forecast-list" id="forecast-low-list">
+            <li style="color:#94a3b8; font-size:0.82rem;">No products yet</li>
+          </ul>
+        </div>
+      </div>
+
+    </section><!-- /#section-market -->
+
+
+    <!-- =================================================================
+         SECTION 5: AI ASSISTANT (full-page version)
+    ================================================================= -->
+    <section class="content-section" id="section-ai">
+
+      <div class="section-header">
+        <div class="section-title">
+          AI Analytics Assistant
+          <span>Ask questions about your store data</span>
+        </div>
+      </div>
+
+      <!-- Full-page chat panel -->
+      <div style="max-width:720px; margin: 0 auto;">
+        <div style="background:#fff; border-radius:var(--radius-lg); border:1px solid var(--border); box-shadow:var(--shadow-md); overflow:hidden;">
+          <!-- Chat header -->
+          <div style="background:linear-gradient(135deg,#2563eb,#7c3aed); padding:20px 24px; display:flex; align-items:center; gap:14px;">
+            <div style="width:48px;height:48px;background:rgba(255,255,255,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;">🤖</div>
+            <div>
+              <div style="font-size:1.05rem;font-weight:700;color:#fff;">RetailTrend AI</div>
+              <div style="font-size:0.78rem;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:6px;">
+                <span style="width:7px;height:7px;background:#4ade80;border-radius:50%;display:inline-block;"></span>
+                Online — Analyzing your store data
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick actions -->
+          <div style="padding:14px 16px; background:#f8fafc; border-bottom:1px solid var(--border); display:flex; flex-wrap:wrap; gap:8px;">
+            <button class="suggestion-chip" onclick="askAI('What is the top selling product?')">🏆 Top product</button>
+            <button class="suggestion-chip" onclick="askAI('Which category is trending?')">📈 Trending category</button>
+            <button class="suggestion-chip" onclick="askAI('What is the total sales count?')">💰 Total sales</button>
+            <button class="suggestion-chip" onclick="askAI('Which product should I restock?')">📦 Restock advice</button>
+            <button class="suggestion-chip" onclick="askAI('Give me a full store summary')">📋 Store summary</button>
+          </div>
+
+          <!-- Messages area (full-page) -->
+          <div id="ai-page-messages" style="height:400px; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:14px; background:#f8fafc;">
+            <div class="chat-msg bot">
+              <div class="chat-msg-icon">🤖</div>
+              <div class="chat-msg-bubble">
+                👋 Hello! I'm your <strong>RetailTrend AI Assistant</strong>.<br><br>
+                I can analyze your store data and answer questions like:<br>
+                • Which product is selling the most?<br>
+                • Which category is trending?<br>
+                • Total revenue and demand forecasts<br><br>
+                Click a quick question above or type your own below!
+              </div>
+            </div>
+          </div>
+
+          <!-- Input area -->
+          <div style="display:flex; align-items:center; gap:10px; padding:14px 16px; border-top:1px solid var(--border); background:#fff;">
+            <input
+              type="text"
+              id="ai-page-input"
+              class="chatbot-input"
+              placeholder="Ask anything about your store..."
+              onkeydown="if(event.key==='Enter') sendAIPageMessage()"
+              style="flex:1;"
+            />
+            <button class="chatbot-send" onclick="sendAIPageMessage()" style="width:44px;height:44px;font-size:18px;">➤</button>
+          </div>
+        </div>
+      </div>
+
+    </section><!-- /#section-ai -->
+
+  </div><!-- /.page-content -->
+</div><!-- /.main-content -->
+
+
+<!-- ============================================================
+     FLOATING AI CHATBOT WIDGET (bottom-right corner)
+============================================================ -->
+<button class="chatbot-toggle" onclick="toggleChatbot()" title="Open AI Assistant" id="chatbot-toggle-btn">
+  🤖
+</button>
+
+<div class="chatbot-window" id="chatbot-window">
+  <!-- Header -->
+  <div class="chatbot-header">
+    <div class="chatbot-avatar">🤖</div>
+    <div class="chatbot-header-info">
+      <div class="chatbot-name">RetailTrend AI</div>
+      <div class="chatbot-status">Online — Smart Analytics</div>
+    </div>
+    <button class="chatbot-close" onclick="toggleChatbot()">✕</button>
+  </div>
+
+  <!-- Messages -->
+  <div class="chatbot-messages" id="chatbot-messages">
+    <div class="chat-msg bot">
+      <div class="chat-msg-icon">🤖</div>
+      <div class="chat-msg-bubble">
+        Hi! I'm your AI analytics assistant. Ask me anything about your store data! 🛍️
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick suggestions -->
+  <div class="chatbot-suggestions">
+    <button class="suggestion-chip" onclick="quickAsk('Top product?')">🏆 Top product</button>
+    <button class="suggestion-chip" onclick="quickAsk('Total sales?')">💰 Sales</button>
+    <button class="suggestion-chip" onclick="quickAsk('Restock advice?')">📦 Restock</button>
+  </div>
+
+  <!-- Input -->
+  <div class="chatbot-input-area">
+    <input
+      type="text"
+      class="chatbot-input"
+      id="chatbot-input"
+      placeholder="Ask a question..."
+      onkeydown="if(event.key==='Enter') sendChatMessage()"
+    />
+    <button class="chatbot-send" onclick="sendChatMessage()">➤</button>
+  </div>
+</div>
+
+<!-- Toast Notification -->
+<div class="toast" id="toast"></div>
+
+<!-- Supabase Library -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+async function checkUser() {
+
+  const { data, error } = await supabaseClient.auth.getUser();
+
+  if (error || !data?.user) {
+ 	 window.location.href = "index.html";
+  }
+}
+async function logoutUser() {
+
+  const { error } = await supabaseClient.auth.signOut();
+
+  if (!error) {
+    window.location.href = "index.html";
+  }
+
+}
+async function loadUser() {
+
+  const { data: { user } } = await supabaseClient.auth.getUser();
+
+  if (user) {
+    const name = user.user_metadata?.full_name || user.email;
+    document.getElementById("navbar-username").textContent = name;
+    document.getElementById("sidebar-name").textContent = name;
+    document.getElementById("sidebar-avatar").textContent = user.email ? user.email[0].toUpperCase() : "U";
+  }
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  await checkUser();
+  await loadUser();
+  document.body.style.display = "block";
+});
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<!-- Main Script -->
+<script src="script.js"></script>
+</body>
+</html>
