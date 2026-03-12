@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RetailTrend — Login</title>
+  <meta name="description" content="Login or register to RetailTrend, the modern SaaS ecommerce analytics platform."/>
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="auth-page">
+
+    <!-- Auth Container -->
+    <div class="auth-container">
+
+      <!-- Logo / Branding -->
+      <div class="auth-logo">
+        <div class="logo-icon">📈</div>
+        <h1>RetailTrend</h1>
+        <p>Smart Analytics for Modern Commerce</p>
+      </div>
+
+      <!-- Auth Card -->
+      <div class="auth-card">
+
+        <!-- Tab Switcher -->
+        <div class="auth-tabs" role="tablist">
+          <button type="button" class="auth-tab-btn active" id="tab-login" onclick="switchTab('login')" role="tab" aria-selected="true">
+            Sign In
+          </button>
+          <button type="button" class="auth-tab-btn" id="tab-register" onclick="switchTab('register')" role="tab" aria-selected="false">
+            Create Account
+          </button>
+        </div>
+
+        <!-- ===== LOGIN FORM ===== -->
+        <form class="auth-form active" id="form-login" novalidate>
+          <div class="form-group">
+            <label for="login-email">Email Address</label>
+            <input
+              type="email"
+              id="login-email" required
+              placeholder="you@example.com"
+              autocomplete="email"
+            />
+          </div>
+          <div class="form-group">
+            <label for="login-password">Password</label>
+            <input
+              type="password"
+              id="login-password" required
+              placeholder="Enter your password"
+              autocomplete="current-password"
+            />
+          </div>
+          <button type="submit" class="btn-primary">Sign In →</button>
+          <div class="auth-message" id="login-msg"></div>
+        </form>
+
+<button type="button"
+        onclick="loginWithGoogle()"
+        class="btn-primary"
+        style="margin-top:10px;background:#ea4335;">
+  Sign in with Google
+</button>
+
+        <!-- ===== REGISTER FORM ===== -->
+        <form class="auth-form" id="form-register" novalidate>
+          <div class="form-group">
+            <label for="reg-name">Full Name</label>
+            <input
+              type="text"
+              id="reg-name" required
+              placeholder="John Smith"
+              autocomplete="name"
+            />
+          </div>
+          <div class="form-group">
+            <label for="reg-email">Email Address</label>
+            <input
+              type="email"
+              id="reg-email" required
+              placeholder="you@example.com"
+              autocomplete="email"
+            />
+          </div>
+          <div class="form-group">
+            <label for="reg-password">Password</label>
+            <input
+              type="password"
+              id="reg-password" required
+              placeholder="Min 6 characters"
+              autocomplete="new-password"
+            />
+          </div>
+          <button type="submit" class="btn-primary">Create Account →</button>
+          <div class="auth-message" id="register-msg"></div>
+        </form>
+
+      </div><!-- /.auth-card -->
+
+      <!-- Footer note -->
+      <p style="text-align:center; color:#475569; font-size:0.78rem; margin-top:20px;">
+        🔒 Your account is securely protected using Supabase authentication
+      </p>
+
+    </div><!-- /.auth-container -->
+
+  <script>
+    const supabaseUrl = "https://jxwsumcnvdzxipysyqtn.supabase.co";
+    const supabaseKey = "sb_publishable_OtIyP7HLqu-lsMhgq5hzfw_bgzmtbQs";
+
+    const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+    // GOOGLE LOGIN
+async function loginWithGoogle() {
+
+  const { data, error } = await supabaseClient.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: window.location.origin + "/dashboard.html"
+    }
+  });
+
+  if (error) {
+    showMsg('login-msg', error.message, 'error');
+  }
+}
+    /* ============================================================
+       Auth Page JavaScript
+       Handles: tab switching, login, registration, localStorage
+    ============================================================ */
+
+    // --- Tab Switcher ---
+    function switchTab(tab) {
+      // Update tab buttons
+      document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+      document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+
+      // Update forms
+      document.getElementById('form-login').classList.toggle('active', tab === 'login');
+      document.getElementById('form-register').classList.toggle('active', tab === 'register');
+
+      // Clear messages when switching
+      clearMessages();
+    }
+
+    // --- Clear all auth messages ---
+    function clearMessages() {
+      const msgs = document.querySelectorAll('.auth-message');
+      msgs.forEach(m => { m.className = 'auth-message'; m.textContent = ''; });
+    }
+
+    // --- Show message helper ---
+    function showMsg(id, text, type) {
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = 'auth-message ' + type;
+    }
+
+    // --- Basic email validator ---
+    function isValidEmail(email) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+
+    // --- LOGIN HANDLER ---
+document.getElementById('form-login').addEventListener('submit', async function(e) {
+  e.preventDefault();
+
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  
+if (!email || !password) {
+  showMsg('login-msg', '⚠️ Please fill all fields', 'error');
+  return;
+}
+if (!isValidEmail(email)) {
+  showMsg('login-msg', '⚠️ Please enter a valid email', 'error');
+  return;
+}
+  
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
+    email: email,
+    password: password
+  });
+
+  if (error) {
+    showMsg('login-msg', error.message, 'error');
+  } else {
+    showMsg('login-msg', '✅ Login successful! Redirecting...', 'success');
+    setTimeout(() => {
+      window.location.href = 'dashboard.html';
+    }, 1000);
+  }
+});
+
+   // --- REGISTER HANDLER ---
+document.getElementById('form-register').addEventListener('submit', async function(e) {
+  e.preventDefault();
+
+  const name = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const password = document.getElementById('reg-password').value;
+
+if (!name || !email || !password) {
+  showMsg('register-msg', '⚠️ Please fill all fields', 'error');
+  return;
+}
+
+if (password.length < 6) {
+  showMsg('register-msg', '⚠️ Password must be at least 6 characters', 'error');
+  return;
+}
+if (!isValidEmail(email)) {
+  showMsg('register-msg', '⚠️ Please enter a valid email', 'error');
+  return;
+}
+
+  const { data, error } = await supabaseClient.auth.signUp({
+    email: email,
+    password: password,
+    options: {
+      data: {
+        full_name: name
+      }
+    }
+  });
+
+  if (error) {
+    showMsg('register-msg', error.message, 'error');
+  } else {
+    showMsg('register-msg', '🎉 Account created! Check your email for verification.', 'success');
+  }
+});
+
+async function checkSession() {
+  const { data, error } = await supabaseClient.auth.getSession();
+
+  if (data && data.session) {
+    window.location.href = "dashboard.html";
+  }
+}
+checkSession();
+</script>
+</body>
+</html>
