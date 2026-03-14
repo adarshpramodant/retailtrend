@@ -210,6 +210,8 @@ async function recordSale(productId, quantity){
 
 async function recordSaleFromForm(){
 
+  const { data: { user } } = await supabaseClient.auth.getUser();
+
   const productId = document.getElementById("sale-product").value;
   const qty = parseInt(document.getElementById("sale-qty").value);
   const date = document.getElementById("sale-date").value;
@@ -235,13 +237,13 @@ async function recordSaleFromForm(){
   const { error: saleError } = await supabaseClient
     .from("sales")
     .insert([
-    {
-    product_id: productId,
-    quantity: qty,
-    total_price: totalPrice,
-    sale_date: date,
-    user_id: user.id
-    }
+      {
+        product_id: productId,
+        quantity: qty,
+        total_price: totalPrice,
+        sale_date: date,
+        user_id: user.id
+      }
     ]);
 
   if(saleError){
@@ -262,7 +264,6 @@ async function recordSaleFromForm(){
   await loadSalesHistory();
   refreshDashboard();
 }
-
 /**
  * addProduct()— Reads form fields, validates, saves to localStorage
  * then refreshes charts and stats
