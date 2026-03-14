@@ -235,12 +235,13 @@ async function recordSaleFromForm(){
   const { error: saleError } = await supabaseClient
     .from("sales")
     .insert([
-      {
-        product_id: productId,
-        quantity: qty,
-        total_price: totalPrice,
-        sale_date: date
-      }
+    {
+    product_id: productId,
+    quantity: qty,
+    total_price: totalPrice,
+    sale_date: date,
+    user_id: user.id
+    }
     ]);
 
   if(saleError){
