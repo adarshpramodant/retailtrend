@@ -124,13 +124,13 @@ async function getProducts(){
     return [];
   }
 
-    return data.map(p => ({
-    id: p.id,
-    product_name: p.product_name,
-    category: p.category,
-    sales: p.stock,
-    date: p.created_at
-  }));
+ return data.map(p => ({
+  id: p.id,
+  name: p.product_name,
+  category: p.category,
+  sales: Number(p.stock),
+  date: p.created_at
+}));
 }
 
 async function clearProductsDB(){
@@ -161,25 +161,24 @@ async function addProduct(){
   const name = document.getElementById("prod-name").value;
   const category = document.getElementById("prod-category").value;
   const sales = parseInt(document.getElementById("prod-sales").value);
-  const date = document.getElementById("prod-date").value;
 
   if(!name || !category || !sales){
     showToast("Fill all fields","error");
     return;
   }
 
-const { data: { user } } = await supabaseClient.auth.getUser();
+  const { data: { user } } = await supabaseClient.auth.getUser();
 
-const { data, error } = await supabaseClient
-  .from("products")
-  .insert([
-    {
-      user_id: user.id,
-      product_name: product_name,
-      category: category,
-      stock: sales
-    }
-  ]);
+  const { data, error } = await supabaseClient
+    .from("products")
+    .insert([
+      {
+        user_id: user.id,
+        product_name: name,
+        category: category,
+        stock: sales
+      }
+    ]);
 
   if(error){
     showToast(error.message,"error");
@@ -188,7 +187,7 @@ const { data, error } = await supabaseClient
 
   showToast("Product added successfully","success");
 
-  loadProducts();
+  renderProductTable();
 }
 /**
  * renderProductTable()— Renders the product data table from localStorage
