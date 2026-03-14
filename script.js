@@ -942,9 +942,9 @@ async function updateForecast(){
   const low    = [];
 
   products.forEach(p => {
-    if (p.sales >= 200)    high.push(p);
-    else if (p.sales >= 50)medium.push(p);
-    else                     low.push(p);
+    if (p.stock >= 200) high.push(p);
+    else if (p.stock >= 50) medium.push(p);
+    else low.push(p);
   });
 
   // Estimated next-week demand: weighted sum
@@ -1044,7 +1044,7 @@ function renderForecastList(listId, products, label, emoji){
     .map(p => `
       <li>
         <span>${emoji} ${escapeHTML(p.name)}</span>
-        <span class="forecast-badge">${p.sales.toLocaleString()} units</span>
+        <span class="forecast-badge">${p.stock.toLocaleString()} units</span>
       </li>
     `).join('');
 }

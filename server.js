@@ -17,9 +17,15 @@ const openai = new OpenAI({
 
 app.post("/api/ai", async (req, res) => {
 
-  const { question, products } = req.body;
+  try {
 
-  const prompt = `
+    const { question, products } = req.body;
+
+    if(!question){
+      return res.json({ answer: "No question provided." });
+    }
+
+    const prompt = `
 You are a retail analytics AI.
 
 Store data:
@@ -28,32 +34,32 @@ ${JSON.stringify(products)}
 User question:
 ${question}
 
-Give helpful business insights.
+Give a short helpful business insight.
 `;
 
-  try {
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "You are a retail analytics expert." },
-        { role: "user", content: prompt }
+        { role:"system", content:"You are a retail analytics assistant." },
+        { role:"user", content: prompt }
       ]
     });
 
+    const answer = response.choices[0].message.content;
+
+    res.json({ answer });
+
+  } catch (err) {
+
+    console.error("AI ERROR:", err);
+
     res.json({
-      answer: completion.choices[0].message.content
+      answer: "⚠ AI service temporarily unavailable. Please try again."
     });
-
-  } catch (error) {
-
-    console.error(error);
-    res.status(500).json({ error: "AI request failed" });
 
   }
 
 });
-
 app.listen(3000, () => {
   console.log("Server running on http://localhost:3000");
 });
