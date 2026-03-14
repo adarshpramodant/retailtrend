@@ -228,6 +228,28 @@
           <div class="insight-label">Total Sales Count</div>
           <div class="insight-value" id="insight-total-sales">0</div>
         </div>
+        <div class="card" style="margin-top:20px;">
+                         <div class="card-header">
+                            <div class="card-title">⚠ Low Stock Alerts</div>
+                         </div>
+
+                         <div class="card-body">
+                             <ul id="low-stock-list">
+                                 <li style="color:#94a3b8;">No alerts</li>
+                             </ul>
+                         </div>
+                   </div>
+                   <div class="card" style="margin-top:20px;">
+ 			 <div class="card-header">
+    				<div class="card-title">🤖 AI Restock Suggestions</div>
+  			</div>
+
+  			<div class="card-body">
+    				<div id="ai-restock">
+      					Analyzing your inventory...
+    				</div>
+  			</div>
+	</div>   
       </div>
 
     </section><!-- /#section-dashboard -->
@@ -270,8 +292,8 @@
             </select>
           </div>
           <div class="form-field">
-            <label for="prod-sales">Sales Count</label>
-            <input type="number" id="prod-sales" placeholder="e.g. 150" min="0"/>
+            <label for="prod-sales">Stock Quantity</label>
+            <input type="number" id="prod-sales" placeholder="e.g. 50">
           </div>
           <div class="form-field">
             <label for="prod-date">Date</label>
@@ -341,7 +363,10 @@
       <label>Quantity Sold</label>
       <input type="number" id="sale-qty" placeholder="e.g. 2">
     </div>
-
+  <div class="form-field">
+ 	 <label>Sale Date</label>
+  	<input type="date" id="sale-date">
+  </div>
   </div>
 
   <button class="btn-add" onclick="recordSaleFromForm()">
@@ -432,6 +457,12 @@
                     <canvas id="categoryGrowthChart"></canvas>
                  </div>
                </div>
+      <div class="chart-card">
+  		  <h3>🤖 AI Sales Prediction</h3>
+ 	          <div class="chart-wrapper">
+    			<canvas id="predictionChart"></canvas>
+  		 </div>
+              </div>
 
     </section><!-- /#section-analytics -->
 

@@ -129,7 +129,7 @@ async function getProducts(){
   id: p.id,
   name: p.product_name,
   category: p.category,
-  sales: Number(p.stock),
+  stock: Number(p.stock),
   date: p.created_at
 }));
 }
@@ -208,6 +208,60 @@ async function recordSale(productId, quantity){
   await loadSalesHistory();
 }
 
+async function recordSaleFromForm(){
+
+  const productId = document.getElementById("sale-product").value;
+  const qty = parseInt(document.getElementById("sale-qty").value);
+  const date = document.getElementById("sale-date").value;
+
+  if(!productId || !qty){
+    showToast("Enter quantity","error");
+    return;
+  }
+
+  const { data: product, error } = await supabaseClient
+    .from("products")
+    .select("*")
+    .eq("id", productId)
+    .single();
+
+  if(error){
+    console.error(error);
+    return;
+  }
+
+  const totalPrice = qty * (product.price || 0);
+
+  const { error: saleError } = await supabaseClient
+    .from("sales")
+    .insert([
+      {
+        product_id: productId,
+        quantity: qty,
+        total_price: totalPrice,
+        sale_date: date
+      }
+    ]);
+
+  if(saleError){
+    console.error(saleError);
+    showToast("Sale failed","error");
+    return;
+  }
+
+  await supabaseClient
+    .from("products")
+    .update({
+      stock: product.stock - qty
+    })
+    .eq("id", productId);
+
+  showToast("Sale recorded","success");
+
+  await loadSalesHistory();
+  refreshDashboard();
+}
+
 /**
  * addProduct()— Reads form fields, validates, saves to localStorage
  * then refreshes charts and stats
@@ -216,9 +270,9 @@ async function addProduct(){
 
   const name = document.getElementById("prod-name").value;
   const category = document.getElementById("prod-category").value;
-  const sales = parseInt(document.getElementById("prod-sales").value);
+  const stock = parseInt(document.getElementById("prod-sales").value);
 
-  if(!name || !category || !sales){
+  if(!name || !category || !stock){
     showToast("Fill all fields","error");
     return;
   }
@@ -232,7 +286,7 @@ async function addProduct(){
         user_id: user.id,
         product_name: name,
         category: category,
-        stock: sales
+        stock: stock
       }
     ]);
 
@@ -292,7 +346,7 @@ async function renderProductTable(){
       <td style="color:#94a3b8; font-weight:600;">${i + 1}</td>
       <td style="font-weight:600; color:#0f172a;">${escapeHTML(p.name)}</td>
       <td><span class="badge ${categoryColors[p.category] || 'badge-blue'}">${escapeHTML(p.category)}</span></td>
-      <td style="font-weight:700; color:#2563eb;">${p.sales.toLocaleString()}</td>
+      <td style="font-weight:700; color:#2563eb;">${p.stock.toLocaleString()}</td>
       <td style="color:#64748b;">${formatDate(p.date)}</td>
     </tr>
   `).join('');
@@ -374,30 +428,23 @@ async function clearProducts(){
  * updateStatsCards()— Reads product data and updates the 4 overview cards
  */
 async function updateStatsCards(){
-  const products = await getProducts();
 
-  // Total Products
+  const { data: products } = await supabaseClient
+  .from("products")
+  .select("*");
+
+  const { data: sales } = await supabaseClient
+  .from("sales")
+  .select("*");
+
   const totalProductsEl = document.getElementById('stat-total-products');
-  if (totalProductsEl)totalProductsEl.textContent = products.length;
+  if (totalProductsEl) totalProductsEl.textContent = products.length;
 
-  // Total Sales
-  const totalSales = products.reduce((sum, p)=> sum + Number(p.sales), 0);
+  const totalSales = sales.reduce((s,x)=>s + x.quantity,0);
+
   const totalSalesEl = document.getElementById('stat-total-sales');
-  if (totalSalesEl)totalSalesEl.textContent = totalSales.toLocaleString();
+  if (totalSalesEl) totalSalesEl.textContent = totalSales;
 
-  // Best-selling product
-  const bestProduct = products.reduce((best, p)=> (!best || p.sales > best.sales ? p : best), null);
-  const bestEl = document.getElementById('stat-best-product');
-  if (bestEl)bestEl.textContent = bestProduct ? bestProduct.name : '—';
-
-  // Top category (by total sales)
-  const categoryMap = {};
-  products.forEach(p => {
-    categoryMap[p.category] = (categoryMap[p.category] || 0)+ p.sales;
-  });
-  const topCategory = Object.entries(categoryMap).sort((a, b)=> b[1] - a[1])[0];
-  const topCatEl = document.getElementById('stat-top-category');
-  if (topCatEl)topCatEl.textContent = topCategory ? topCategory[0] : '—';
 }
 
 
@@ -676,6 +723,7 @@ async function refreshCharts(){
   renderBarChart('productBarChart', productNames, productSales);
   renderMonthlyChart();
   renderCategoryGrowth();
+  await renderPredictionChart();
 }
 
 renderMonthlyChart();
@@ -686,9 +734,72 @@ function refreshDashboard(){
   refreshCharts();
   updateInsights();
   updateTopProducts();
+  updateLowStock();
+  updateRestockSuggestions();
   loadAIInsights();
 }
 
+async function renderPredictionChart(){
+
+  const { data: sales } = await supabaseClient
+  .from("sales")
+  .select("*")
+  .order("sale_date");
+
+  if(!sales || sales.length === 0) return;
+
+  const dateMap = {};
+
+  sales.forEach(s=>{
+    const d = s.sale_date;
+    dateMap[d] = (dateMap[d] || 0) + s.quantity;
+  });
+
+  const labels = Object.keys(dateMap);
+  const actual = Object.values(dateMap);
+
+  // Simple prediction model
+  const predicted = actual.map((v,i)=>{
+    if(i === 0) return v;
+    return Math.round((v + actual[i-1]) / 2);
+  });
+
+  const canvas = document.getElementById("predictionChart");
+  if(!canvas) return;
+
+  if(chartInstances["predictionChart"]){
+    chartInstances["predictionChart"].destroy();
+  }
+
+  chartInstances["predictionChart"] = new Chart(canvas,{
+    type:"line",
+    data:{
+      labels,
+      datasets:[
+        {
+          label:"Actual Sales",
+          data:actual,
+          borderColor:"#2563eb",
+          backgroundColor:"rgba(37,99,235,0.1)",
+          tension:0.4
+        },
+        {
+          label:"Predicted Sales",
+          data:predicted,
+          borderColor:"#ef4444",
+          backgroundColor:"rgba(239,68,68,0.1)",
+          borderDash:[6,6],
+          tension:0.4
+        }
+      ]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false
+    }
+  });
+
+}
 
 /* ============================================================
    6. MARKET INSIGHTS ANALYZER
@@ -853,6 +964,65 @@ async function updateForecast(){
   renderForecastList('forecast-high-list', high, 'High',   '🔴');
   renderForecastList('forecast-med-list',  medium, 'Medium','🟡');
   renderForecastList('forecast-low-list',  low,  'Low',    '🟢');
+}
+
+async function updateLowStock(){
+
+  const products = await getProducts();
+
+  const lowStock = products.filter(p => p.sales <= 5);
+
+  const list = document.getElementById("low-stock-list");
+
+  if(!list) return;
+
+  if(lowStock.length === 0){
+    list.innerHTML = `<li style="color:#10b981;">✅ All products sufficiently stocked</li>`;
+    return;
+  }
+
+  list.innerHTML = lowStock.map(p => `
+    <li style="color:#ef4444;">
+      ⚠ ${escapeHTML(p.name)} — only ${p.sales} left
+    </li>
+  `).join("");
+
+}
+
+async function updateRestockSuggestions(){
+
+  const products = await getProducts();
+
+  const container = document.getElementById("ai-restock");
+
+  if(!container) return;
+
+  if(products.length === 0){
+    container.innerHTML = "Add products to generate suggestions.";
+    return;
+  }
+
+  const suggestions = products
+    .filter(p => p.sales <= 5)
+    .sort((a,b) => a.sales - b.sales)
+    .slice(0,3);
+
+  if(suggestions.length === 0){
+    container.innerHTML = `
+      <span style="color:#10b981;">
+      ✅ Inventory levels look healthy. No urgent restock needed.
+      </span>
+    `;
+    return;
+  }
+
+  container.innerHTML = suggestions.map(p => `
+    <div style="margin-bottom:8px;">
+      ⚠ <strong>${escapeHTML(p.name)}</strong> stock is low (${p.sales} left).<br>
+      Suggested restock: <strong>${20 - p.sales} units</strong>
+    </div>
+  `).join("");
+
 }
 
 /**
@@ -1133,11 +1303,18 @@ document.addEventListener('DOMContentLoaded', async function (){
   await sessionGuard();
 
   setDefaultDate();
+  const saleDate = document.getElementById("sale-date");
+
+  if(saleDate){
+	saleDate.value = new Date().toISOString().split("T")[0];
+     } 
 
   await renderProductTable();
   await loadSalesProducts();
      await loadSalesHistory();
   await updateStatsCards();
+  await updateLowStock();
+     await updateRestockSuggestions();
   await updateInsights();
   await updateForecast();
 
