@@ -152,6 +152,48 @@ function setDefaultDate(){
   }
 }
 
+async function recordSale(productId, quantity){
+
+  const { data: product, error } = await supabaseClient
+    .from("products")
+    .select("*")
+    .eq("id", productId)
+    .single();
+
+  if(error){
+    console.error(error);
+    return;
+  }
+
+  const totalPrice = quantity * (product.price || 0);
+
+  // insert sale
+  const { error: saleError } = await supabaseClient
+    .from("sales")
+    .insert([
+      {
+        product_id: productId,
+        quantity: quantity,
+        total_price: totalPrice
+      }
+    ]);
+
+  if(saleError){
+    console.error(saleError);
+    return;
+  }
+
+  // update stock
+  await supabaseClient
+    .from("products")
+    .update({ stock: product.stock - quantity })
+    .eq("id", productId);
+
+  showToast("Sale recorded","success");
+
+  refreshDashboard();
+}
+
 /**
  * addProduct()— Reads form fields, validates, saves to localStorage
  * then refreshes charts and stats
@@ -234,7 +276,7 @@ async function renderProductTable(){
   tbody.innerHTML = sorted.map((p, i)=> `
     <tr>
       <td style="color:#94a3b8; font-weight:600;">${i + 1}</td>
-      <td style="font-weight:600; color:#0f172a;">${escapeHTML(p.product_name)}</td>
+      <td style="font-weight:600; color:#0f172a;">${escapeHTML(p.name)}</td>
       <td><span class="badge ${categoryColors[p.category] || 'badge-blue'}">${escapeHTML(p.category)}</span></td>
       <td style="font-weight:700; color:#2563eb;">${p.sales.toLocaleString()}</td>
       <td style="color:#64748b;">${formatDate(p.date)}</td>
@@ -281,7 +323,7 @@ async function updateStatsCards(){
   // Best-selling product
   const bestProduct = products.reduce((best, p)=> (!best || p.sales > best.sales ? p : best), null);
   const bestEl = document.getElementById('stat-best-product');
-  if (bestEl)bestEl.textContent = bestProduct ? bestProduct.product_name : '—';
+  if (bestEl)bestEl.textContent = bestProduct ? bestProduct.name : '—';
 
   // Top category (by total sales)
   const categoryMap = {};
@@ -564,7 +606,7 @@ async function refreshCharts(){
   renderPieChart('dashPieChart',     pieLabels, pieData);
 
   // --- PRODUCT BAR CHART ---
-  const productNames  = products.map(p => p.product_name);
+  const productNames  = products.map(p => p.name);
   const productSales  = products.map(p => p.sales);
   renderBarChart('productBarChart', productNames, productSales);
   renderMonthlyChart();
@@ -627,9 +669,9 @@ async function updateInsights(){
 
   // Update DOM
   const set = (id, val)=> { const el = document.getElementById(id); if (el)el.textContent = val; };
-  set('insight-trending',    trending.product_name);
+  set('insight-trending',    trending.name);
   set('insight-growing',     fastestCat);
-  set('insight-top',         topProduct.product_name);
+  set('insight-top',         topProduct.name);
   set('insight-total-sales', totalSales.toLocaleString());
 }
 
@@ -646,7 +688,7 @@ async function updateTopProducts(){
   if(!list) return;
 
   list.innerHTML = sorted.map(p => `
-    <li>${p.product_name} — ${p.sales} units</li>
+    <li>${p.name} — ${p.sales} units</li>
   `).join("");
 }
 
@@ -766,7 +808,7 @@ function renderForecastList(listId, products, label, emoji){
     .slice(0, 6)
     .map(p => `
       <li>
-        <span>${emoji} ${escapeHTML(p.product_name)}</span>
+        <span>${emoji} ${escapeHTML(p.name)}</span>
         <span class="forecast-badge">${p.sales.toLocaleString()} units</span>
       </li>
     `).join('');
@@ -811,7 +853,7 @@ async function buildAIResponse(question){
 
   if (q.includes('top') || q.includes('best')){
     const top = products.reduce((best,p)=>p.sales>best.sales?p:best,products[0]);
-    return `🏆 Top product: ${top.product_name} (${top.sales} units)`;
+    return `🏆 Top product: ${top.name} (${top.sales} units)`;
   }
 
   if (q.includes('total sales')){
