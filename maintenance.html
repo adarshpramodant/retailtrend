@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>RetailTrend — Maintenance</title>
+
+<style>
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family: "Inter", sans-serif;
+}
+
+body{
+height:100vh;
+display:flex;
+align-items:center;
+justify-content:center;
+background: radial-gradient(circle at top,#1e293b,#020617);
+color:white;
+overflow:hidden;
+}
+
+.container{
+text-align:center;
+max-width:650px;
+padding:40px;
+}
+
+.logo{
+font-size:32px;
+font-weight:700;
+margin-bottom:20px;
+letter-spacing:1px;
+}
+
+.logo span{
+color:#60a5fa;
+}
+
+h1{
+font-size:42px;
+margin-bottom:15px;
+}
+
+p{
+color:#94a3b8;
+font-size:18px;
+margin-bottom:30px;
+}
+
+.status{
+display:inline-block;
+padding:8px 16px;
+border-radius:20px;
+background:#1e293b;
+color:#38bdf8;
+font-size:14px;
+margin-bottom:30px;
+}
+
+.chart{
+position:absolute;
+bottom:0;
+left:0;
+width:100%;
+height:200px;
+opacity:0.25;
+}
+
+.line{
+stroke:#38bdf8;
+stroke-width:3;
+fill:none;
+stroke-dasharray:1000;
+stroke-dashoffset:1000;
+animation:draw 6s linear infinite;
+}
+
+@keyframes draw{
+to{
+stroke-dashoffset:0;
+}
+}
+
+.footer{
+margin-top:40px;
+font-size:14px;
+color:#64748b;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="logo">
+Retail<span>Trend</span>
+</div>
+
+<div class="status">
+🚧 System Upgrade
+</div>
+
+<h1>We're improving RetailTrend</h1>
+
+<p>
+Our AI analytics engine is currently being upgraded.<br>
+We'll be back online shortly.
+</p>
+
+<p>
+Expected downtime: <strong>5–10 minutes</strong>
+</p>
+
+<div class="footer">
+© 2026 RetailTrend — AI Product Intelligence
+</div>
+
+</div>
+
+<svg class="chart" viewBox="0 0 1200 200">
+<polyline class="line"
+points="0,150 100,120 200,140 300,90 400,110 500,60 600,80 700,40 800,70 900,30 1000,60 1100,20 1200,50"/>
+</svg>
+
+</body>
+</html>
+

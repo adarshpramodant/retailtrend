@@ -102,12 +102,43 @@ body {
   66% { transform: translate(-20px, 20px) scale(0.95); }
 }
 
+/* Logo floating animation */
+@keyframes floatLogo{
+  0%,100%{transform:translateY(0);}
+  50%{transform:translateY(-6px);}
+}
+
 .auth-container {
   position: relative;
   z-index: 10;
   width: 100%;
   max-width: 460px;
   padding: 16px;
+}
+
+/* glowing light behind login card */
+.auth-container::before{
+  content:"";
+  position:absolute;
+  width:320px;
+  height:320px;
+  background: radial-gradient(circle, rgba(37,99,235,0.45), transparent 70%);
+  top:-80px;
+  left:-80px;
+  filter:blur(60px);
+  z-index:-1;
+}
+
+.auth-container::after{
+  content:"";
+  position:absolute;
+  width:280px;
+  height:280px;
+  background: radial-gradient(circle, rgba(124,58,237,0.4), transparent 70%);
+  bottom:-80px;
+  right:-80px;
+  filter:blur(60px);
+  z-index:-1;
 }
 
 .auth-logo {
@@ -126,6 +157,7 @@ body {
   margin-bottom: 12px;
   font-size: 26px;
   box-shadow: 0 8px 24px rgba(37,99,235,0.4);
+  animation: floatLogo 4s ease-in-out infinite;
 }
 
 .auth-logo h1 {
@@ -141,13 +173,29 @@ body {
   margin-top: 4px;
 }
 
-.auth-card {
-  background: rgba(255,255,255,0.07);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: var(--radius-xl);
-  padding: 36px;
-  backdrop-filter: blur(20px);
-  box-shadow: 0 24px 80px rgba(0,0,0,0.4);
+.auth-card{
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 20px;
+  padding: 40px;
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  box-shadow: 0 30px 90px rgba(0,0,0,0.45);
+  transition: all 0.35s ease;
+}
+
+.auth-card:hover{
+  transition: all 0.35s ease;
+  box-shadow: 0 40px 120px rgba(0,0,0,0.55);
+}
+
+.auth-card h2{
+  color:white;
+  text-align:center;
+  font-size:1.4rem;
+  font-weight:700;
+  margin-bottom:24px;
+  letter-spacing:-0.2px;
 }
 
 .auth-tabs {
@@ -234,6 +282,32 @@ body {
   transition: var(--transition);
   margin-top: 6px;
   letter-spacing: 0.3px;
+}
+
+/* Google login button */
+.google-btn{
+  width:100%;
+  padding:13px;
+  background:white;
+  border:none;
+  border-radius:10px;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+
+  font-weight:600;
+  font-size:0.95rem;
+  color:#444;
+
+  cursor:pointer;
+  transition:all 0.25s ease;
+}
+
+.google-btn:hover{
+  background:#f1f5f9;
+  transform:translateY(-1px);
 }
 
 .btn-primary:hover {

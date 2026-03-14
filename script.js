@@ -118,19 +118,18 @@ async function getProducts(){
     .from("products")
     .select("*")
     .eq("user_id", user.id)
-    .order("date", { ascending: false });
-
+    .order("created_at", { ascending: false });
   if (error){
     console.error("Error fetching products:", error);
     return [];
   }
 
-  return data.map(p => ({
+    return data.map(p => ({
     id: p.id,
-    name: p.product_name,
+    name: p.name,
     category: p.category,
-    sales: p.sales,
-    date: p.date
+    sales: p.stock,
+    date: p.created_at
   }));
 }
 
@@ -159,42 +158,37 @@ function setDefaultDate(){
  */
 async function addProduct(){
 
-  const name     = document.getElementById('prod-name').value.trim();
-  const category = document.getElementById('prod-category').value;
-  const sales    = parseInt(document.getElementById('prod-sales').value, 10);
-  const date     = document.getElementById('prod-date').value;
+  const name = document.getElementById("prod-name").value;
+  const category = document.getElementById("prod-category").value;
+  const sales = parseInt(document.getElementById("prod-sales").value);
+  const date = document.getElementById("prod-date").value;
 
-  if (!name || !category || isNaN(sales)|| !date){
-    showToast("Please fill all fields", "error");
+  if(!name || !category || !sales){
+    showToast("Fill all fields","error");
     return;
   }
 
-  // get logged in user
-  const { data: { user } } = await supabaseClient.auth.getUser();
+const { data: { user } } = await supabaseClient.auth.getUser();
 
-  const { error } = await supabaseClient
-    .from("products")
-    .insert([
-      {
-        product_name: name,
-        category: category,
-        sales: sales,
-        date: date,
-        user_id: user.id
-      }
-    ]);
+const { data, error } = await supabaseClient
+  .from("products")
+  .insert([
+    {
+      user_id: user.id,
+      name: name,
+      category: category,
+      stock: sales
+    }
+  ]);
 
-  if (error){
-    console.error(error);
-    showToast("Error saving product", "error");
-  } else {
-    showToast("✅ Product saved to database");
-    await renderProductTable();
-    await updateStatsCards();
-    await updateInsights();
-    await updateForecast();
-    refreshCharts();
+  if(error){
+    showToast(error.message,"error");
+    return;
   }
+
+  showToast("Product added successfully","success");
+
+  loadProducts();
 }
 /**
  * renderProductTable()— Renders the product data table from localStorage
