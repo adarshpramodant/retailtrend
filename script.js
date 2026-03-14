@@ -60,6 +60,7 @@ async function sessionGuard(){
 const PAGE_META = {
   dashboard: { title: 'Dashboard',        subtitle: 'Overview & Sales Analytics' },
   products:  { title: 'Products',         subtitle: 'Manage your product sales data' },
+  sales: { title: 'Sales', subtitle: 'Record store transactions' },
   analytics: { title: 'Sales Analytics',  subtitle: 'Visual charts and performance metrics' },
   market:    { title: 'Market Trends',    subtitle: 'Live market data & demand forecasts' },
   ai:        { title: 'AI Assistant',     subtitle: 'Ask questions about your store data' },
@@ -133,6 +134,18 @@ async function getProducts(){
 }));
 }
 
+async function loadSalesProducts(){
+
+  const products = await getProducts();
+  const select = document.getElementById("sale-product");
+
+  if(!select) return;
+
+  select.innerHTML = products.map(p =>
+    `<option value="${p.id}">${p.name}</option>`
+  ).join("");
+}
+
 async function clearProductsDB(){
 
   const { data: { user } } = await supabaseClient.auth.getUser();
@@ -192,6 +205,7 @@ async function recordSale(productId, quantity){
   showToast("Sale recorded","success");
 
   refreshDashboard();
+  await loadSalesHistory();
 }
 
 /**
@@ -282,6 +296,57 @@ async function renderProductTable(){
       <td style="color:#64748b;">${formatDate(p.date)}</td>
     </tr>
   `).join('');
+}
+
+async function loadSalesHistory(){
+
+  const { data, error } = await supabaseClient
+    .from("sales")
+    .select(`
+      id,
+      quantity,
+      total_price,
+      sale_date,
+      products ( product_name )
+    `)
+    .order("sale_date", { ascending:false });
+
+  if(error){
+    console.error(error);
+    return;
+  }
+
+  const tbody = document.getElementById("sales-table-body");
+  const count = document.getElementById("sales-count");
+
+  if(!tbody) return;
+
+  count.textContent = data.length;
+
+  if(data.length === 0){
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5">
+          <div class="empty-state">
+            <div class="empty-icon">💰</div>
+            <p>No sales recorded yet.</p>
+          </div>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = data.map((s,i)=>`
+    <tr>
+      <td>${i+1}</td>
+      <td>${formatDate(s.sale_date)}</td>
+      <td>${escapeHTML(s.products.product_name)}</td>
+      <td>${s.quantity}</td>
+      <td>$${s.total_price}</td>
+    </tr>
+  `).join("");
+
 }
 
 /** Clear all products (with confirmation)*/
@@ -1070,6 +1135,8 @@ document.addEventListener('DOMContentLoaded', async function (){
   setDefaultDate();
 
   await renderProductTable();
+  await loadSalesProducts();
+     await loadSalesHistory();
   await updateStatsCards();
   await updateInsights();
   await updateForecast();

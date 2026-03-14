@@ -40,6 +40,11 @@
       <span class="nav-icon">📦</span>
       Products
     </button>
+    
+    <button class="nav-item" onclick="showSection('sales')" id="nav-sales">
+      <span class="nav-icon">💰</span>
+      Sales
+    </button>
 
     <!-- Sales Analytics -->
     <button class="nav-item" onclick="showSection('analytics')" id="nav-analytics">
@@ -314,6 +319,71 @@
 
     </section><!-- /#section-products -->
 
+<section class="content-section" id="section-sales">
+
+<div class="section-header">
+  <div class="section-title">
+    Record Sale
+    <span>Add new sales transactions</span>
+  </div>
+</div>
+
+<div class="add-product-form">
+
+  <div class="form-grid">
+
+    <div class="form-field">
+      <label>Product</label>
+      <select id="sale-product"></select>
+    </div>
+
+    <div class="form-field">
+      <label>Quantity Sold</label>
+      <input type="number" id="sale-qty" placeholder="e.g. 2">
+    </div>
+
+  </div>
+
+  <button class="btn-add" onclick="recordSaleFromForm()">
+    Record Sale
+  </button>
+
+</div>
+<div class="table-container" style="margin-top:25px;">
+  <div class="table-header">
+    <div class="table-title">
+      📜 Sales History
+      <span class="badge-count" id="sales-count">0</span>
+    </div>
+  </div>
+
+  <div style="overflow-x:auto;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Date</th>
+          <th>Product</th>
+          <th>Quantity</th>
+          <th>Total Price</th>
+        </tr>
+      </thead>
+
+      <tbody id="sales-table-body">
+        <tr>
+          <td colspan="5">
+            <div class="empty-state">
+              <div class="empty-icon">💰</div>
+              <p>No sales recorded yet.</p>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+
+    </table>
+  </div>
+</div>
+</section>
 
     <!-- =================================================================
          SECTION 3: SALES ANALYTICS
