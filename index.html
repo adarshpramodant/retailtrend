@@ -1,59 +1,185 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>RetailTrend — Login</title>
-  <meta name="description" content="Login or register to RetailTrend, the modern SaaS ecommerce analytics platform."/>
-  <link rel="stylesheet" href="style.css"/>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>"/>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>RetailTrend</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+
+/* ===== GLOBAL ===== */
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  background: radial-gradient(circle at top, #1e293b, #020617);
+  color: white;
+}
+
+/* ===== LAYOUT ===== */
+.container {
+  display: flex;
+  height: 100vh;
+}
+
+/* LEFT SIDE (MARKETING) */
+.left {
+  flex: 1;
+  padding: 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* RIGHT SIDE (LOGIN) */
+.right {
+  width: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ===== BRAND ===== */
+.logo {
+  font-size: 34px;
+  font-weight: 700;
+}
+
+.tagline {
+  margin-top: 10px;
+  color: #94a3b8;
+}
+
+/* ===== HERO ===== */
+.hero {
+  margin-top: 40px;
+}
+
+.hero h1 {
+  font-size: 42px;
+  line-height: 1.2;
+}
+
+.hero p {
+  margin-top: 15px;
+  color: #cbd5f5;
+  font-size: 16px;
+}
+
+/* ===== FEATURES ===== */
+.features {
+  margin-top: 40px;
+}
+
+.feature {
+  margin-bottom: 15px;
+  font-size: 15px;
+  color: #e2e8f0;
+}
+
+/* ===== LOGIN CARD ===== */
+.card {
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(25px);
+  padding: 40px;
+  border-radius: 16px;
+  width: 300px;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+}
+
+.card h2 {
+  margin-bottom: 20px;
+}
+
+/* ===== BUTTON ===== */
+.google-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  background: white;
+  color: black;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.25s;
+}
+
+.google-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px rgba(255,255,255,0.3);
+}
+
+/* ===== FOOTER ===== */
+.footer {
+  margin-top: 20px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+</style>
 </head>
-<body class="auth-page">
 
-    <!-- Auth Container -->
-    <div class="auth-container">
+<body>
 
-      <!-- Logo / Branding -->
-      <div class="auth-logo">
-        <div class="logo-icon">📈</div>
-        <h1>RetailTrend</h1>
-        <p>Smart Analytics for Modern Commerce</p>
+<div class="container">
+
+  <!-- LEFT SIDE -->
+  <div class="left">
+
+    <div class="logo">📈 RetailTrend</div>
+    <div class="tagline">Smart Analytics for Modern Commerce</div>
+
+    <div class="hero">
+      <h1>Turn your shop data into<br>real business growth</h1>
+      <p>
+        Track sales trends, identify top products, and make smarter decisions 
+        using powerful analytics designed for retail businesses.
+      </p>
+    </div>
+
+    <div class="features">
+      <div class="feature">📊 Real-time sales analytics</div>
+      <div class="feature">🔥 Identify trending products instantly</div>
+      <div class="feature">📉 Detect slow-moving inventory</div>
+      <div class="feature">🚀 Data-driven business decisions</div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT SIDE -->
+  <div class="right">
+
+    <div class="card">
+
+      <h2>Get Started</h2>
+
+      <button onclick="loginWithGoogle()" class="google-btn">
+        Continue with Google
+      </button>
+
+      <div id="login-msg" class="footer"></div>
+
+      <div class="footer">
+        🔒 Secure login powered by Supabase
       </div>
 
-<div class="auth-card">
+    </div>
 
-<h2 style="color:white;">Sign in to continue</h2>
+  </div>
 
-<button type="button" onclick="loginWithGoogle()" class="google-btn">
+</div>
 
-<img src="https://developers.google.com/identity/images/g-logo.png" width="18">
+<script>
 
-Continue with Google
+const supabaseUrl = "https://jxwsumcnvdzxipysyqtn.supabase.co";
+const supabaseKey = "YOUR_KEY_HERE";
 
-</button>
+const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-<div class="auth-message" id="login-msg"></div>
-
-</div><!-- /.auth-card -->
-
-      <!-- Footer note -->
-      <p style="text-align:center; color:#475569; font-size:0.78rem; margin-top:20px;">
-        🔒 Your account is securely protected using Supabase authentication
-      </p>
-
-    </div><!-- /.auth-container -->
-
-  <script>
-    const supabaseUrl = "https://jxwsumcnvdzxipysyqtn.supabase.co";
-    const supabaseKey = "sb_publishable_OtIyP7HLqu-lsMhgq5hzfw_bgzmtbQs";
-
-    const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
-
-    // GOOGLE LOGIN
 async function loginWithGoogle() {
-
-  const { data, error } = await supabaseClient.auth.signInWithOAuth({
+  const { error } = await supabaseClient.auth.signInWithOAuth({
     provider: "google",
     options: {
       redirectTo: window.location.origin + "/dashboard.html"
@@ -61,32 +187,20 @@ async function loginWithGoogle() {
   });
 
   if (error) {
-    showMsg('login-msg', error.message, 'error');
+    document.getElementById("login-msg").innerText = error.message;
   }
 }
-    /* ============================================================
-       Auth Page JavaScript
-       Handles: tab switching, login, registration, localStorage
-    ============================================================ */
 
-    // --- Show message helper ---
-    function showMsg(id, text, type) {
-      const el = document.getElementById(id);
-      el.textContent = text;
-      el.className = 'auth-message ' + type;
-    }
-
-async function checkSession(){
-
-const { data } = await supabaseClient.auth.getSession()
-
-if(data.session){
-window.location.href = "dashboard.html"
-}
-
+async function checkSession() {
+  const { data } = await supabaseClient.auth.getSession();
+  if (data.session) {
+    window.location.href = "dashboard.html";
+  }
 }
 
 checkSession();
+
 </script>
+
 </body>
 </html>

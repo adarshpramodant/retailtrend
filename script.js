@@ -106,6 +106,11 @@ function showSection(name){
    PRODUCT MANAGEMENT — SUPABASE DATABASE
 ============================================================ */
 
+async function getCurrentUser(){
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  return user;
+}
+
 async function getProducts(){
 
   const { data: { user } } = await supabaseClient.auth.getUser();
@@ -165,7 +170,36 @@ function setDefaultDate(){
   }
 }
 
+async function getSalesAnalytics(){
+
+  const { data: { user } } = await supabaseClient.auth.getUser();
+
+  const { data, error } = await supabaseClient
+    .from("sales")
+    .select(`
+      quantity,
+      total_price,
+      sale_date,
+      products ( product_name, category )
+    `)
+    .eq("user_id", user.id);
+
+  if(error){
+    console.error(error);
+    return [];
+  }
+
+  return data || [];
+}
+
 async function recordSale(productId, quantity){
+
+  const user = await getCurrentUser();
+
+  if(!productId || !quantity || quantity <= 0){
+    showToast("Invalid quantity","error");
+    return;
+  }
 
   const { data: product, error } = await supabaseClient
     .from("products")
@@ -173,34 +207,51 @@ async function recordSale(productId, quantity){
     .eq("id", productId)
     .single();
 
-  if(error){
+  if(error || !product){
     console.error(error);
+    showToast("Product not found","error");
     return;
   }
 
   const totalPrice = quantity * (product.price || 0);
 
-  // insert sale
+  // ✅ STEP 1: SAFE STOCK UPDATE
+  const { error: updateError } = await supabaseClient
+    .from("products")
+    .update({ stock: product.stock - quantity })
+    .eq("id", productId)
+    .gte("stock", quantity);
+
+  if(updateError){
+    showToast("Not enough stock","error");
+    return;
+  }
+
+  // ✅ STEP 2: INSERT SALE
   const { error: saleError } = await supabaseClient
     .from("sales")
     .insert([
       {
         product_id: productId,
-        quantity: quantity,
-        total_price: totalPrice
+        quantity,
+        total_price: totalPrice,
+        user_id: user.id
       }
     ]);
 
+  // 🚨 STEP 3: ROLLBACK IF INSERT FAILS
   if(saleError){
     console.error(saleError);
+
+    // rollback stock
+    await supabaseClient
+      .from("products")
+      .update({ stock: product.stock })
+      .eq("id", productId);
+
+    showToast("Sale failed (rolled back)","error");
     return;
   }
-
-  // update stock
-  await supabaseClient
-    .from("products")
-    .update({ stock: product.stock - quantity })
-    .eq("id", productId);
 
   showToast("Sale recorded","success");
 
@@ -208,16 +259,17 @@ async function recordSale(productId, quantity){
   await loadSalesHistory();
 }
 
+
 async function recordSaleFromForm(){
 
-  const { data: { user } } = await supabaseClient.auth.getUser();
+  const user = await getCurrentUser();
 
   const productId = document.getElementById("sale-product").value;
   const qty = parseInt(document.getElementById("sale-qty").value);
   const date = document.getElementById("sale-date").value;
 
-  if(!productId || !qty){
-    showToast("Enter quantity","error");
+  if(!productId || !qty || qty <= 0){
+    showToast("Enter valid quantity","error");
     return;
   }
 
@@ -227,13 +279,27 @@ async function recordSaleFromForm(){
     .eq("id", productId)
     .single();
 
-  if(error){
+  if(error || !product){
     console.error(error);
+    showToast("Product not found","error");
     return;
   }
 
   const totalPrice = qty * (product.price || 0);
 
+  // ✅ STEP 1: STOCK UPDATE
+  const { error: updateError } = await supabaseClient
+    .from("products")
+    .update({ stock: product.stock - qty })
+    .eq("id", productId)
+    .gte("stock", qty);
+
+  if(updateError){
+    showToast("Not enough stock","error");
+    return;
+  }
+
+  // ✅ STEP 2: INSERT SALE
   const { error: saleError } = await supabaseClient
     .from("sales")
     .insert([
@@ -246,29 +312,33 @@ async function recordSaleFromForm(){
       }
     ]);
 
+  // 🚨 STEP 3: ROLLBACK IF FAILS
   if(saleError){
     console.error(saleError);
-    showToast("Sale failed","error");
+
+    await supabaseClient
+      .from("products")
+      .update({ stock: product.stock })
+      .eq("id", productId);
+
+    showToast("Sale failed (rolled back)","error");
     return;
   }
-
-  await supabaseClient
-    .from("products")
-    .update({
-      stock: product.stock - qty
-    })
-    .eq("id", productId);
 
   showToast("Sale recorded","success");
 
   await loadSalesHistory();
   refreshDashboard();
 }
+
+
 /**
  * addProduct()— Reads form fields, validates, saves to localStorage
  * then refreshes charts and stats
  */
 async function addProduct(){
+
+  const user = await getCurrentUser();
 
   const name = document.getElementById("prod-name").value;
   const category = document.getElementById("prod-category").value;
@@ -279,31 +349,24 @@ async function addProduct(){
     return;
   }
 
-  const { data: { user } } = await supabaseClient.auth.getUser();
+  await supabaseClient.from("products").insert([
+    {
+      user_id: user.id,
+      product_name: name,
+      category,
+      stock
+    }
+  ]);
 
-  const { data, error } = await supabaseClient
-    .from("products")
-    .insert([
-      {
-        user_id: user.id,
-        product_name: name,
-        category: category,
-        stock: stock
-      }
-    ]);
-
-  if(error){
-    showToast(error.message,"error");
-    return;
-  }
-
-  showToast("Product added successfully","success");
+  showToast("Product added","success");
 
   renderProductTable();
 }
+
 /**
  * renderProductTable()— Renders the product data table from localStorage
  */
+
 async function renderProductTable(){
   const products = await getProducts();
   const tbody    = document.getElementById('product-table-body');
@@ -354,7 +417,10 @@ async function renderProductTable(){
   `).join('');
 }
 
+
 async function loadSalesHistory(){
+
+  const user = await getCurrentUser();   // ✅ ADD THIS
 
   const { data, error } = await supabaseClient
     .from("sales")
@@ -365,6 +431,7 @@ async function loadSalesHistory(){
       sale_date,
       products ( product_name )
     `)
+    .eq("user_id", user.id)
     .order("sale_date", { ascending:false });
 
   if(error){
@@ -377,19 +444,10 @@ async function loadSalesHistory(){
 
   if(!tbody) return;
 
-  count.textContent = data.length;
+  count.textContent = data?.length || 0;
 
-  if(data.length === 0){
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="5">
-          <div class="empty-state">
-            <div class="empty-icon">💰</div>
-            <p>No sales recorded yet.</p>
-          </div>
-        </td>
-      </tr>
-    `;
+  if(!data || data.length === 0){
+    tbody.innerHTML = `<tr><td colspan="5">No sales</td></tr>`;
     return;
   }
 
@@ -397,13 +455,13 @@ async function loadSalesHistory(){
     <tr>
       <td>${i+1}</td>
       <td>${formatDate(s.sale_date)}</td>
-      <td>${escapeHTML(s.products.product_name)}</td>
+      <td>${escapeHTML(s.products?.product_name)}</td>
       <td>${s.quantity}</td>
       <td>$${s.total_price}</td>
     </tr>
   `).join("");
-
 }
+
 
 /** Clear all products (with confirmation)*/
 async function clearProducts(){
@@ -431,22 +489,55 @@ async function clearProducts(){
  */
 async function updateStatsCards(){
 
-  const { data: products } = await supabaseClient
-  .from("products")
-  .select("*");
+  const user = await getCurrentUser();
+  if (!user) return;
 
-  const { data: sales } = await supabaseClient
-  .from("sales")
-  .select("*");
+  // Fetch safely
+  const { data: products, error: prodError } = await supabaseClient
+    .from("products")
+    .select("*")
+    .eq("user_id", user.id);
 
-  const totalProductsEl = document.getElementById('stat-total-products');
-  if (totalProductsEl) totalProductsEl.textContent = products.length;
+  const sales = await getSalesAnalytics();
 
-  const totalSales = sales.reduce((s,x)=>s + x.quantity,0);
+  // SAFE FALLBACKS
+  const productCount = products?.length || 0;
+  const totalUnits = (sales || []).reduce((s,x)=> s + (x.quantity || 0), 0);
 
-  const totalSalesEl = document.getElementById('stat-total-sales');
-  if (totalSalesEl) totalSalesEl.textContent = totalSales;
+  document.getElementById('stat-total-products').textContent = productCount;
+  document.getElementById('stat-total-sales').textContent = totalUnits;
 
+  // ---- TOP PRODUCT ----
+  const productMap = {};
+
+  sales.forEach(s=>{
+    const name = s.products?.product_name;
+    if (!name) return;
+
+    productMap[name] = (productMap[name] || 0) + s.quantity;
+  });
+
+  const topProductEntry = Object.entries(productMap)
+    .sort((a,b)=>b[1]-a[1])[0];
+
+  document.getElementById('stat-best-product').textContent =
+    topProductEntry ? topProductEntry[0] : "—";
+
+  // ---- TOP CATEGORY ----
+  const categoryMap = {};
+
+  sales.forEach(s=>{
+    const cat = s.products?.category;
+    if (!cat) return;
+
+    categoryMap[cat] = (categoryMap[cat] || 0) + s.quantity;
+  });
+
+  const topCategoryEntry = Object.entries(categoryMap)
+    .sort((a,b)=>b[1]-a[1])[0];
+
+  document.getElementById('stat-top-category').textContent =
+    topCategoryEntry ? topCategoryEntry[0] : "—";
 }
 
 
@@ -645,45 +736,41 @@ function renderBarChart(canvasId, labels, data){
     }
   });
 }
+
 async function renderMonthlyChart(){
 
-  const products = await getProducts();
+  const sales = await getSalesAnalytics();
 
-  const monthMap = {};
+  const map = {};
 
-  products.forEach(p => {
-    const month = p.date.slice(0,7); // YYYY-MM
-    monthMap[month] = (monthMap[month] || 0) + p.sales;
+  sales.forEach(s=>{
+    const month = s.sale_date.slice(0,7);
+    map[month] = (map[month] || 0) + s.quantity;
   });
-
-  const labels = Object.keys(monthMap);
-  const data = Object.values(monthMap);
 
   renderLineChart(
     "monthlySalesChart",
-    labels,
-    data,
+    Object.keys(map),
+    Object.values(map),
     "Monthly Sales"
   );
 }
 
 async function renderCategoryGrowth(){
 
-  const products = await getProducts();
+  const sales = await getSalesAnalytics();
 
   const map = {};
 
-  products.forEach(p=>{
-    map[p.category] = (map[p.category] || 0) + p.sales;
+  sales.forEach(s=>{
+    const cat = s.products?.category;
+    map[cat] = (map[cat] || 0) + s.quantity;
   });
-
-  const labels = Object.keys(map);
-  const data = Object.values(map);
 
   renderBarChart(
     "categoryGrowthChart",
-    labels,
-    data
+    Object.keys(map),
+    Object.values(map)
   );
 }
 
@@ -691,41 +778,26 @@ async function renderCategoryGrowth(){
  * refreshCharts()— Builds chart data from localStorage and re-renders all charts
  */
 async function refreshCharts(){
-  const products = await getProducts();
 
-  // --- SALES TREND CHART (line)---
-  // Group total sales by date
+  const user = await getCurrentUser();
+
+  const { data: sales } = await supabaseClient
+    .from("sales")
+    .select("sale_date, quantity, products(product_name, category)")
+    .eq("user_id", user.id);
+
+  if(!sales || sales.length === 0) return;
+
   const dateMap = {};
-  products.forEach(p => {
-    dateMap[p.date] = (dateMap[p.date] || 0)+ p.sales;
+  sales.forEach(s=>{
+    dateMap[s.sale_date] = (dateMap[s.sale_date] || 0) + s.quantity;
   });
-  const sortedDates = Object.keys(dateMap).sort();
-  const trendLabels = sortedDates.map(d => formatDate(d));
-  const trendData   = sortedDates.map(d => dateMap[d]);
 
-  // Main analytics page
-  renderLineChart('salesTrendChart', trendLabels, trendData, 'Total Sales');
-  // Dashboard mini chart
-  renderLineChart('dashMiniChart', trendLabels, trendData, 'Sales');
+  const labels = Object.keys(dateMap).sort();
+  const data = labels.map(d=>dateMap[d]);
 
-  // --- CATEGORY PIE CHART ---
-  const catMap = {};
-  products.forEach(p => {
-    catMap[p.category] = (catMap[p.category] || 0)+ p.sales;
-  });
-  const pieLabels = Object.keys(catMap);
-  const pieData   = Object.values(catMap);
-
-  renderPieChart('categoryPieChart', pieLabels, pieData);
-  renderPieChart('dashPieChart',     pieLabels, pieData);
-
-  // --- PRODUCT BAR CHART ---
-  const productNames  = products.map(p => p.name);
-  const productSales  = products.map(p => p.sales);
-  renderBarChart('productBarChart', productNames, productSales);
-  renderMonthlyChart();
-  renderCategoryGrowth();
-  await renderPredictionChart();
+  renderLineChart("salesTrendChart", labels, data, "Sales");
+  renderLineChart("dashMiniChart", labels, data, "Sales");
 }
 
 renderMonthlyChart();
@@ -742,66 +814,64 @@ function refreshDashboard(){
 }
 
 async function renderPredictionChart(){
+  const user = await getCurrentUser();
 
   const { data: sales } = await supabaseClient
-  .from("sales")
-  .select("*")
-  .order("sale_date");
+    .from("sales")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("sale_date");
 
   if(!sales || sales.length === 0) return;
 
   const dateMap = {};
 
-  sales.forEach(s=>{
-    const d = s.sale_date;
-    dateMap[d] = (dateMap[d] || 0) + s.quantity;
-  });
+sales.forEach(s=>{
+  const d = s.sale_date;
+  dateMap[d] = (dateMap[d] || 0) + s.quantity;
+});
 
-  const labels = Object.keys(dateMap);
-  const actual = Object.values(dateMap);
+const labels = Object.keys(dateMap);
+const actual = Object.values(dateMap);
 
-  // Simple prediction model
-  const predicted = actual.map((v,i)=>{
-    if(i === 0) return v;
-    return Math.round((v + actual[i-1]) / 2);
-  });
+// Moving average prediction
+const predicted = actual.map((_, i) => {
+  const start = Math.max(0, i - 2);
+  const subset = actual.slice(start, i + 1);
+  return Math.round(subset.reduce((a,b)=>a+b,0) / subset.length);
+});
 
-  const canvas = document.getElementById("predictionChart");
-  if(!canvas) return;
+const canvas = document.getElementById("predictionChart");
+if(!canvas) return;
 
-  if(chartInstances["predictionChart"]){
-    chartInstances["predictionChart"].destroy();
-  }
-
-  chartInstances["predictionChart"] = new Chart(canvas,{
-    type:"line",
-    data:{
-      labels,
-      datasets:[
-        {
-          label:"Actual Sales",
-          data:actual,
-          borderColor:"#2563eb",
-          backgroundColor:"rgba(37,99,235,0.1)",
-          tension:0.4
-        },
-        {
-          label:"Predicted Sales",
-          data:predicted,
-          borderColor:"#ef4444",
-          backgroundColor:"rgba(239,68,68,0.1)",
-          borderDash:[6,6],
-          tension:0.4
-        }
-      ]
-    },
-    options:{
-      responsive:true,
-      maintainAspectRatio:false
-    }
-  });
-
+if(chartInstances["predictionChart"]){
+  chartInstances["predictionChart"].destroy();
 }
+
+chartInstances["predictionChart"] = new Chart(canvas,{
+  type:"line",
+  data:{
+    labels,
+    datasets:[
+      {
+        label:"Actual Sales",
+        data:actual,
+        borderColor:"#2563eb",
+        backgroundColor:"rgba(37,99,235,0.1)",
+        tension:0.4
+      },
+      {
+        label:"Predicted (Moving Avg)",
+        data:predicted,
+        borderColor:"#ef4444",
+        borderDash:[6,6],
+        tension:0.4
+      }
+    ]
+  }
+});
+}
+
 
 /* ============================================================
    6. MARKET INSIGHTS ANALYZER
@@ -813,60 +883,57 @@ async function renderPredictionChart(){
  * updates the 4 insight cards: trending, fastest growing, top, total
  */
 async function updateInsights(){
-  const products = await getProducts();
 
-  // Default empty state
-  if (products.length === 0){
-    ['insight-trending', 'insight-growing', 'insight-top', 'insight-total-sales'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el)el.textContent = id.includes('total')? '0' : 'Add products to see insights';
-    });
-    return;
-  }
+  const user = await getCurrentUser();
 
-  // Total sales
-  const totalSales = products.reduce((sum, p)=> sum + Number(p.sales), 0);
+  const { data: sales } = await supabaseClient
+    .from("sales")
+    .select("quantity, products(product_name, category)")
+    .eq("user_id", user.id);
 
-  // Top selling product (highest single sales count)
-  const topProduct = products.reduce((best, p)=> (p.sales > best.sales ? p : best), products[0]);
+  if(!sales || sales.length === 0) return;
 
-  // Trending product: highest sales in the most recent 7 days
-  const now    = new Date();
-  const week   = new Date(now.getTime()- 7 * 24 * 60 * 60 * 1000);
-  const recent = products.filter(p => new Date(p.date)>= week);
-  const trending = (recent.length > 0 ? recent : products)
-    .reduce((best, p)=> (p.sales > best.sales ? p : best), products[0]);
+  let total = 0;
+  const productMap = {};
+  const categoryMap = {};
 
-  // Fastest growing category: highest total sales by category
-  const catMap = {};
-  products.forEach(p => {
-    catMap[p.category] = (catMap[p.category] || 0)+ p.sales;
+  sales.forEach(s=>{
+    total += s.quantity;
+
+    const name = s.products?.product_name;
+    const cat = s.products?.category;
+
+    if(name) productMap[name] = (productMap[name] || 0) + s.quantity;
+    if(cat) categoryMap[cat] = (categoryMap[cat] || 0) + s.quantity;
   });
-  const topCatEntry = Object.entries(catMap).sort((a, b)=> b[1] - a[1])[0];
-  const fastestCat  = topCatEntry ? topCatEntry[0] : '—';
 
-  // Update DOM
-  const set = (id, val)=> { const el = document.getElementById(id); if (el)el.textContent = val; };
-  set('insight-trending',    trending.name);
-  set('insight-growing',     fastestCat);
-  set('insight-top',         topProduct.name);
-  set('insight-total-sales', totalSales.toLocaleString());
+  const topProduct = Object.entries(productMap).sort((a,b)=>b[1]-a[1])[0]?.[0];
+  const topCategory = Object.entries(categoryMap).sort((a,b)=>b[1]-a[1])[0]?.[0];
+
+  document.getElementById("insight-top").textContent = topProduct || "—";
+  document.getElementById("insight-growing").textContent = topCategory || "—";
+  document.getElementById("insight-total-sales").textContent = total;
 }
 
 async function updateTopProducts(){
 
-  const products = await getProducts();
+  const sales = await getSalesAnalytics();
 
-  const sorted = [...products]
-    .sort((a,b)=>b.sales-a.sales)
+  const map = {};
+
+  sales.forEach(s=>{
+    const name = s.products?.product_name;
+    map[name] = (map[name] || 0) + s.quantity;
+  });
+
+  const sorted = Object.entries(map)
+    .sort((a,b)=>b[1]-a[1])
     .slice(0,5);
 
   const list = document.getElementById("top-products-list");
 
-  if(!list) return;
-
-  list.innerHTML = sorted.map(p => `
-    <li>${p.name} — ${p.sales} units</li>
+  list.innerHTML = sorted.map(([name, qty]) => `
+    <li>${name} — ${qty} sold</li>
   `).join("");
 }
 
@@ -937,42 +1004,37 @@ async function fetchMarketTrends(){
  * Low:    sales < 50
  */
 async function updateForecast(){
-  const products = await getProducts();
 
-  const high   = [];
-  const medium = [];
-  const low    = [];
+  const sales = await getSalesAnalytics();
 
-  products.forEach(p => {
-    if (p.stock >= 200) high.push(p);
-    else if (p.stock >= 50) medium.push(p);
-    else low.push(p);
+  const map = {};
+
+  sales.forEach(s=>{
+    const name = s.products?.product_name;
+    map[name] = (map[name] || 0) + s.quantity;
   });
 
-  // Estimated next-week demand: weighted sum
-  const avgSales   = products.length > 0
-    ? products.reduce((s, p)=> s + p.sales, 0)/ products.length
-    : 0;
-  const nextWeek   = Math.round(avgSales * 1.12); // 12% growth projection
+  const high = [];
+  const medium = [];
+  const low = [];
 
-  // Update counters
-  const set = (id, val)=> { const el = document.getElementById(id); if (el)el.textContent = val; };
-  set('forecast-next-week',   nextWeek.toLocaleString());
-  set('forecast-high-count',  high.length);
-  set('forecast-med-count',   medium.length);
-  set('forecast-low-count',   low.length);
+  Object.entries(map).forEach(([name, qty])=>{
+    if(qty >= 200) high.push({ name, qty });
+    else if(qty >= 50) medium.push({ name, qty });
+    else low.push({ name, qty });
+  });
 
-  // Render lists
-  renderForecastList('forecast-high-list', high, 'High',   '🔴');
-  renderForecastList('forecast-med-list',  medium, 'Medium','🟡');
-  renderForecastList('forecast-low-list',  low,  'Low',    '🟢');
+  // render lists
+  renderForecastList("forecast-high-list", high, "High", "🔴");
+  renderForecastList("forecast-med-list", medium, "Medium", "🟡");
+  renderForecastList("forecast-low-list", low, "Low", "🟢");
 }
 
 async function updateLowStock(){
 
   const products = await getProducts();
 
-  const lowStock = products.filter(p => p.sales <= 5);
+  const lowStock = products.filter(p => p.stock <= 5);
 
   const list = document.getElementById("low-stock-list");
 
@@ -985,7 +1047,7 @@ async function updateLowStock(){
 
   list.innerHTML = lowStock.map(p => `
     <li style="color:#ef4444;">
-      ⚠ ${escapeHTML(p.name)} — only ${p.sales} left
+      ⚠ ${escapeHTML(p.name)} — only ${p.stock} left
     </li>
   `).join("");
 
@@ -1005,8 +1067,8 @@ async function updateRestockSuggestions(){
   }
 
   const suggestions = products
-    .filter(p => p.sales <= 5)
-    .sort((a,b) => a.sales - b.sales)
+    .filter(p => p.stock <= 5)
+    .sort((a,b) => a.stock - b.stock)
     .slice(0,3);
 
   if(suggestions.length === 0){
@@ -1020,8 +1082,8 @@ async function updateRestockSuggestions(){
 
   container.innerHTML = suggestions.map(p => `
     <div style="margin-bottom:8px;">
-      ⚠ <strong>${escapeHTML(p.name)}</strong> stock is low (${p.sales} left).<br>
-      Suggested restock: <strong>${20 - p.sales} units</strong>
+      ⚠ <strong>${escapeHTML(p.name)}</strong> stock is low (${p.stock} left).<br>
+      Suggested restock: <strong>${20 - p.stock} units</strong>
     </div>
   `).join("");
 
@@ -1036,20 +1098,21 @@ function renderForecastList(listId, products, label, emoji){
   if (!list)return;
 
   if (products.length === 0){
-    list.innerHTML = `<li style="color:#94a3b8; font-size:0.82rem;">No products in this category</li>`;
+    list.innerHTML = `<li>No data</li>`;
     return;
   }
 
   list.innerHTML = products
-    .sort((a, b)=> b.sales - a.sales)
+    .sort((a, b)=> b.qty - a.qty)
     .slice(0, 6)
     .map(p => `
       <li>
         <span>${emoji} ${escapeHTML(p.name)}</span>
-        <span class="forecast-badge">${p.stock.toLocaleString()} units</span>
+        <span>${p.qty} units</span>
       </li>
     `).join('');
 }
+
 
 
 /* ============================================================
@@ -1088,15 +1151,27 @@ async function buildAIResponse(question){
 
   // fallback local responses if AI fails
 
-  if (q.includes('top') || q.includes('best')){
-    const top = products.reduce((best,p)=>p.sales>best.sales?p:best,products[0]);
-    return `🏆 Top product: ${top.name} (${top.sales} units)`;
-  }
-
   if (q.includes('total sales')){
-    const total = products.reduce((s,p)=>s+p.sales,0);
-    return `💰 Total sales: ${total}`;
-  }
+       const sales = await getSalesAnalytics();
+       const total = sales.reduce((s,x)=>s + x.quantity, 0);
+       return `💰 Total units sold: ${total}`;
+     }
+
+  if (q.includes('top') || q.includes('best')){
+    const sales = await getSalesAnalytics();
+
+       const map = {};
+       sales.forEach(s=>{
+          const name = s.products?.product_name;
+          map[name] = (map[name] || 0) + s.quantity;
+       });
+
+       const top = Object.entries(map).sort((a,b)=>b[1]-a[1])[0];
+
+       return top
+          ? `🏆 Top product: ${top[0]} (${top[1]} units sold)`
+          : "No sales data available.";
+     }
 
   return "AI could not generate a response.";
 }
@@ -1263,38 +1338,37 @@ function escapeHTML(str){
     .replace(/'/g, '&#39;');
 }
 async function exportReport(){
- const products = await getProducts();
 
-  if(products.length === 0){
-    showToast("No data available for report","error");
+  const user = await getCurrentUser();
+
+  const { data: products } = await supabaseClient
+    .from("products")
+    .select("*")
+    .eq("user_id", user.id);
+
+  const { data: sales } = await supabaseClient
+    .from("sales")
+    .select("quantity, total_price, products(product_name)")
+    .eq("user_id", user.id);
+
+  if(!products || products.length === 0){
+    showToast("No data","error");
     return;
   }
+
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
 
-  const totalSales = products.reduce((s,p)=>s+p.sales,0);
+  const totalUnits = (sales || []).reduce((s,x)=>s+x.quantity,0);
+  const totalRevenue = (sales || []).reduce((s,x)=>s+x.total_price,0);
 
-  const top = products.reduce((best,p)=>
-    p.sales > best.sales ? p : best
-  ,products[0] || {product_name:"N/A",sales:0});
+  doc.text("RetailTrend Report",20,20);
+  doc.text(`Products: ${products.length}`,20,40);
+  doc.text(`Units Sold: ${totalUnits}`,20,50);
+  doc.text(`Revenue: $${totalRevenue}`,20,60);
 
-  doc.setFontSize(22);
- doc.setTextColor(37,99,235);
- doc.text("RetailTrend Analytics Report",20,20);
- doc.setTextColor(0,0,0);
-
-  doc.setFontSize(12);
-  doc.text(`Total Products: ${products.length}`,20,40);
-  doc.text(`Total Sales: ${totalSales}`,20,50);
-  doc.text(`Top Product: ${top.product_name}`,20,60);
-  doc.text(`Top Product Sales: ${top.sales}`,20,70);
-
-  doc.text(`Generated: ${new Date().toLocaleString()}`,20,90);
-
-  doc.save("RetailTrend_Report.pdf");
-
+  doc.save("report.pdf");
 }
-
 
 /* ============================================================
    12. BOOTSTRAP — Initialize the dashboard on page load
@@ -1336,7 +1410,9 @@ document.addEventListener('DOMContentLoaded', async function (){
   // REALTIME DATABASE LISTENER
 const { data: { user } } = await supabaseClient.auth.getUser();
 
-if (user) {
+if (user?.id) {
+
+  // PRODUCTS
   supabaseClient
     .channel('products-realtime')
     .on(
@@ -1353,6 +1429,24 @@ if (user) {
         refreshCharts();
         updateInsights();
         updateForecast();
+      }
+    )
+    .subscribe();
+
+  // SALES
+  supabaseClient
+    .channel('sales-realtime')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'sales',
+        filter: `user_id=eq.${user.id}`
+      },
+      () => {
+        loadSalesHistory();
+        refreshDashboard();
       }
     )
     .subscribe();
