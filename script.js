@@ -1172,8 +1172,6 @@ async function buildAIResponse(question){
     console.warn("AI API not available, using fallback");
   }
 
-  const data = await res.json();
-
   if(data.answer){
     return data.answer;
   }
@@ -1228,8 +1226,6 @@ async function loadAIInsights(){
   } catch (e) {
     data.answer = "Basic insights: Track top products and restock low items.";
   }
-
-  const data = await res.json();
 
   document.getElementById("ai-insights").innerHTML = data.answer;
 }
