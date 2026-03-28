@@ -135,6 +135,7 @@ async function getProducts(){
   name: p.product_name,
   category: p.category,
   stock: Number(p.stock),
+  price: Number(p.price || 0),
   date: p.created_at
 }));
 }
@@ -161,6 +162,8 @@ async function clearProductsDB(){
     .eq("user_id", user.id);
 
   if (error)console.error(error);
+  await loadSalesProducts();   // ✅ RESET DROPDOWN
+  await loadSalesHistory();    // ✅ RESET TABLE
 }
 /** Set today's date as default value for the date input */
 function setDefaultDate(){
@@ -343,6 +346,7 @@ async function addProduct(){
   const name = document.getElementById("prod-name").value;
   const category = document.getElementById("prod-category").value;
   const stock = parseInt(document.getElementById("prod-sales").value);
+  const price = parseFloat(document.getElementById("prod-price")?.value || 0);
 
   if(!name || !category || !stock){
     showToast("Fill all fields","error");
@@ -354,13 +358,18 @@ async function addProduct(){
       user_id: user.id,
       product_name: name,
       category,
-      stock
+      stock,
+      price
     }
   ]);
 
   showToast("Product added","success");
 
-  renderProductTable();
+  await renderProductTable();
+  await loadSalesProducts();   // ✅ ADD THIS
+  document.getElementById("prod-name").value = "";
+  document.getElementById("prod-category").value = "";
+  document.getElementById("prod-sales").value = "";
 }
 
 /**
@@ -457,7 +466,7 @@ async function loadSalesHistory(){
       <td>${formatDate(s.sale_date)}</td>
       <td>${escapeHTML(s.products?.product_name)}</td>
       <td>${s.quantity}</td>
-      <td>$${s.total_price}</td>
+      <td>₹${s.total_price}</td>
     </tr>
   `).join("");
 }
@@ -798,6 +807,25 @@ async function refreshCharts(){
 
   renderLineChart("salesTrendChart", labels, data, "Sales");
   renderLineChart("dashMiniChart", labels, data, "Sales");
+  // CATEGORY PIE
+  const categoryMap = {};
+  sales.forEach(s=>{
+    const cat = s.products?.category;
+    categoryMap[cat] = (categoryMap[cat] || 0) + s.quantity;
+  });
+
+  renderPieChart(
+    "categoryPieChart",
+    Object.keys(categoryMap),
+    Object.values(categoryMap)
+  );
+
+  // DASHBOARD PIE
+  renderPieChart(
+    "dashPieChart",
+    Object.keys(categoryMap),
+    Object.values(categoryMap)
+  );
 }
 
 renderMonthlyChart();
@@ -1132,16 +1160,17 @@ async function buildAIResponse(question){
   const products = await getProducts();
   const q = question.toLowerCase();
 
-  const res = await fetch("/api/ai",{
-    method:"POST",
-    headers:{
-      "Content-Type":"application/json"
-    },
-    body: JSON.stringify({
-      question,
-      products
-    })
-  });
+  let data = {};
+  try {
+     const res = await fetch("/api/ai",{
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ question, products })
+    });
+    data = await res.json();
+  } catch (e) {
+    console.warn("AI API not available, using fallback");
+  }
 
   const data = await res.json();
 
@@ -1185,16 +1214,20 @@ async function loadAIInsights(){
     return;
   }
 
-  const res = await fetch("/api/ai",{
-    method:"POST",
-    headers:{
-      "Content-Type":"application/json"
-    },
-    body: JSON.stringify({
-      question: "Give short business insights about my store",
-      products
-    })
-  });
+  let data = {};
+  try {
+    const res = await fetch("/api/ai",{
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({
+        question: "Give short business insights about my store",
+        products
+      })
+    });
+    data = await res.json();
+  } catch (e) {
+    data.answer = "Basic insights: Track top products and restock low items.";
+  }
 
   const data = await res.json();
 

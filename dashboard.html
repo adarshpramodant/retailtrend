@@ -293,6 +293,10 @@
           </div>
           <div class="form-field">
             <label for="prod-sales">Stock Quantity</label>
+	    <div class="form-field">
+                                  <label for="prod-price">Price</label>
+                                  <input type="number" id="prod-price" placeholder="e.g. 999">
+                             </div>
             <input type="number" id="prod-sales" placeholder="e.g. 50">
           </div>
           <div class="form-field">
@@ -682,7 +686,11 @@
 
 <!-- Supabase Library -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
+<script>
+const supabaseUrl = "https://jxwsumcnvdzxipysyqtn.supabase.co";   // replace if needed
+const supabaseKey = "sb_publishable_OtIyP7HLqu-lsMhgq5hzfw_bgzmtbQs";  // copy from API Keys
+const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+</script>
 <script>
 async function checkUser() {
 
@@ -714,8 +722,13 @@ async function loadUser() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  await checkUser();
-  await loadUser();
+  try {
+    await checkUser();
+    await loadUser();
+  } catch (e) {
+    console.error("Auth Error:", e);
+  }
+
   document.body.style.display = "block";
 });
 </script>
