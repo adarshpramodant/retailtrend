@@ -1231,7 +1231,7 @@ async function buildAIResponse(question){
   try {
     const products = await getProducts();
 
-    const res = await fetch("http://localhost:3000/api/ai", {
+    const res = await fetch("https://retailtrend.onrender.com/api/ai", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
