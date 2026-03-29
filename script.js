@@ -1279,7 +1279,7 @@ async function loadAIInsights(){
 
     container.innerHTML = "🤖 Generating AI insights...";
 
-    const res = await fetch("http://localhost:3000/api/ai", {
+    const res = await fetch("https:retailtrend.onrender.com/api/ai", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
