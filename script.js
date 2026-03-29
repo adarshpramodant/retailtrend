@@ -1232,7 +1232,7 @@ async function buildAIResponse(question){
   try {
     const products = await getProducts();
 
-    const res = await fetch("API_URL", {
+    const res = await fetch(API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -1283,7 +1283,7 @@ async function loadAIInsights(){
 
     container.innerHTML = "🤖 Generating AI insights...";
 
-    const res = await fetch("API_URL", {
+    const res = await fetch(API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
