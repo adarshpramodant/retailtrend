@@ -1638,3 +1638,111 @@ async function calculateProfit(){
   document.getElementById("stat-profit").textContent =
     "₹" + new Intl.NumberFormat('en-IN').format(profit);
 }
+
+async function generateDummyProducts() {
+
+  const user = await getCurrentUser();
+
+  const products = [
+    { name: "iPhone 14", category: "Electronics", stock: 50, price: 80000 },
+    { name: "Samsung TV", category: "Electronics", stock: 30, price: 45000 },
+    { name: "Nike Shoes", category: "Sports", stock: 100, price: 5000 },
+    { name: "T-Shirt", category: "Clothing", stock: 200, price: 800 },
+    { name: "Coffee Maker", category: "Home & Living", stock: 40, price: 3500 },
+    { name: "Backpack", category: "Accessories", stock: 120, price: 1500 },
+    { name: "Face Cream", category: "Beauty", stock: 90, price: 600 },
+    { name: "Cricket Bat", category: "Sports", stock: 60, price: 2500 },
+    { name: "Laptop Dell", category: "Electronics", stock: 25, price: 70000 },
+    { name: "AI Book", category: "Books", stock: 150, price: 500 }
+  ];
+
+  for (let p of products) {
+    await supabaseClient.from("products").insert([
+      {
+        user_id: user.id,
+        product_name: p.name,
+        category: p.category,
+        stock: p.stock,
+        price: p.price,
+        created_at: getRandomDate().toISOString()
+      }
+    ]);
+  }
+
+  alert("✅ Dummy products added");
+
+  await renderProductTable();
+  await loadSalesProducts();
+}
+
+async function generateUltraRealisticSales() {
+
+  const user = await getCurrentUser();
+
+  const { data: products } = await supabaseClient
+    .from("products")
+    .select("*")
+    .eq("user_id", user.id);
+
+  if (!products || products.length === 0) {
+    alert("Add products first!");
+    return;
+  }
+
+  for (let i = 0; i < 150; i++) {
+
+    const dateObj = getRandomDate(60);
+    const day = dateObj.getDay();
+
+    let quantity = Math.floor(Math.random() * 5) + 1;
+
+    // Weekend boost
+    if (day === 0 || day === 6) {
+      quantity += Math.floor(Math.random() * 10) + 5;
+    }
+
+    // Festival spike
+    if (Math.random() < 0.05) {
+      quantity += Math.floor(Math.random() * 20) + 10;
+    }
+
+    // Popular products
+    const weightedProducts = [
+      ...products,
+      ...products.slice(0, 3),
+      ...products.slice(0, 2)
+    ];
+
+    const product =
+      weightedProducts[Math.floor(Math.random() * weightedProducts.length)];
+
+    // Slow products
+    if (products.indexOf(product) > 5) {
+      quantity = Math.max(1, Math.floor(quantity / 2));
+    }
+
+    await supabaseClient.from("sales").insert([
+      {
+        product_id: product.id,
+        quantity,
+        total_price: quantity * (product.price || 100),
+        sale_date: dateObj.toISOString(),
+        user_id: user.id
+      }
+    ]);
+  }
+
+  alert("🚀 Ultra realistic data generated");
+
+  await loadSalesHistory();
+  refreshDashboard();
+}
+
+function getRandomDate(daysBack = 30) {
+  const today = new Date();
+  const past = new Date();
+
+  past.setDate(today.getDate() - Math.floor(Math.random() * daysBack));
+
+  return past;
+}
