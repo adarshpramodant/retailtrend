@@ -40,6 +40,16 @@
   --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* 🌙 DARK MODE */
+body.dark {
+  --body-bg: #0f172a;
+  --card-bg: #1e293b;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --border: #334155;
+  --navbar-bg: #1e293b;
+}
+
 /* --- Reset & Base --- */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -586,7 +596,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.section-header div:last-child {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .section-title {
@@ -618,11 +634,20 @@ body {
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border);
   display: flex;
-  align-items: flex-start;
-  gap: 16px;
+  flex-direction: column;   /* 🔥 IMPORTANT */
+  justify-content: space-between;
+  gap: 10px;
   transition: var(--transition);
   position: relative;
   overflow: hidden;
+}
+
+.stat-icon {
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  word-break: break-word;
 }
 
 .stat-card::before {
@@ -631,6 +656,9 @@ body {
   top: 0; left: 0; right: 0;
   height: 3px;
   border-radius: 2px;
+}
+.stat-icon {
+  margin-bottom: 10px;
 }
 
 .stat-card.blue::before { background: linear-gradient(90deg, #2563eb, #06b6d4); }
@@ -688,9 +716,13 @@ body {
 /* --- Cards Grid (2-col) --- */
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 24px;
+  align-items: stretch;
   margin-bottom: 28px;
+}
+.stat-card {
+  height: 100%;
 }
 
 /* --- White Card --- */
@@ -700,8 +732,19 @@ body {
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+
+  min-height: 120px;
+  transition: all 0.25s ease;
 }
 
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
 .card-header {
   padding: 20px 22px 0;
   display: flex;
@@ -1457,4 +1500,110 @@ body {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+/* ✨ FADE ANIMATION */
+.fade-in {
+  animation: fadeIn 0.6s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(15px);}
+  to { opacity: 1; transform: translateY(0);}
+}
+
+/* BUTTON HOVER */
+.btn-add:hover {
+  transform: scale(1.05);
+  transition: 0.3s;
+}
+/* ⏳ LOADER */
+.loader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255,255,255,0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.loader::after {
+  content: "";
+  width: 40px;
+  height: 40px;
+  border: 5px solid #2563eb;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ✨ HERO ANIMATION */
+.hero {
+  animation: fadeUp 1s ease;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 🌈 BUTTON IMPROVE */
+.google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* 💡 HOVER GLOW */
+.google-btn:hover {
+  box-shadow: 0 10px 40px rgba(255,255,255,0.4);
+}
+
+/* 📱 MOBILE FIX */
+@media (max-width: 900px) {
+  .container {
+    flex-direction: column;
+  }
+
+  .left {
+    display: none;
+  }
+
+  .right {
+    width: 100%;
+  }
+}
+
+body.dark .card {
+  background: rgba(30,41,59,0.6);
+}
+@media (max-width: 768px){
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .table-container {
+    overflow-x: auto;
+  }
+
+  .data-table {
+    min-width: 600px;
+  }
 }

@@ -11,6 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body class="dashboard-layout" style="display:none;">
+<div id="loader" class="loader"></div>
 
 <!-- ============================================================
      SIDEBAR NAVIGATION
@@ -45,6 +46,8 @@
       <span class="nav-icon">💰</span>
       Sales
     </button>
+   
+    
 
     <!-- Sales Analytics -->
     <button class="nav-item" onclick="showSection('analytics')" id="nav-analytics">
@@ -103,11 +106,12 @@
       <button class="navbar-logout-btn" onclick="logoutUser()">
         🚪 Logout
       </button>
+      <button id="theme-toggle" class="btn-pill">🌙</button>
     </div>
   </header>
 
   <!-- ====== PAGE CONTENT ====== -->
-  <div class="page-content">
+  <div class="page-content fade-in">
 
     <!-- =================================================================
          SECTION 1: DASHBOARD (Overview)
@@ -169,6 +173,13 @@
             <div class="stat-change">Highest sales volume</div>
           </div>
         </div>
+        <div class="stat-card green">
+  			<div class="stat-icon">💰</div>
+  			<div class="stat-info">
+    				<div class="stat-label">Profit</div>
+    		   		<div id="stat-profit" class="stat-value">₹0</div>
+  	      </div>
+	</div>
       </div>
 
       <!-- Quick Chart Preview (mini line) -->
@@ -292,13 +303,14 @@
             </select>
           </div>
           <div class="form-field">
-            <label for="prod-sales">Stock Quantity</label>
-	    <div class="form-field">
-                                  <label for="prod-price">Price</label>
-                                  <input type="number" id="prod-price" placeholder="e.g. 999">
-                             </div>
-            <input type="number" id="prod-sales" placeholder="e.g. 50">
-          </div>
+  				<label for="prod-sales">Stock Quantity</label>
+  				<input type="number" id="prod-sales" placeholder="e.g. 50">
+	  </div>
+
+	  <div class="form-field">
+  				<label for="prod-price">Price</label>
+ 				<input type="number" id="prod-price" placeholder="e.g. 999">
+	  </div>
           <div class="form-field">
             <label for="prod-date">Date</label>
             <input type="date" id="prod-date"/>
@@ -325,7 +337,8 @@
                 <th>#</th>
                 <th>Product Name</th>
                 <th>Category</th>
-                <th>Sales</th>
+                <th>Stock</th>
+		<th>Price</th>
                 <th>Date</th>
               </tr>
             </thead>
@@ -384,8 +397,13 @@
       📜 Sales History
       <span class="badge-count" id="sales-count">0</span>
     </div>
-  </div>
 
+    <!-- ✅ ADD THIS BUTTON -->
+    <button class="btn-pill" onclick="clearSalesDB()" 
+      style="color:#ef4444; border-color:#fecaca; background:#fff0f0;">
+      🗑 Clear Sales
+    </button>
+  </div>
   <div style="overflow-x:auto;">
     <table class="data-table">
       <thead>

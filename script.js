@@ -136,7 +136,7 @@ async function getProducts(){
   category: p.category,
   stock: Number(p.stock),
   price: Number(p.price || 0),
-  date: p.created_at
+  date: p.created_at ? p.created_at.split("T")[0] : null
 }));
 }
 
@@ -161,16 +161,45 @@ async function clearProductsDB(){
     .delete()
     .eq("user_id", user.id);
 
-  if (error)console.error(error);
-  await loadSalesProducts();   // ✅ RESET DROPDOWN
-  await loadSalesHistory();    // ✅ RESET TABLE
-}
-/** Set today's date as default value for the date input */
-function setDefaultDate(){
-  const dateInput = document.getElementById('prod-date');
-  if (dateInput && !dateInput.value){
-    dateInput.value = new Date().toISOString().split('T')[0];
+  if (error){
+    console.error("DELETE ERROR:", error);
+    alert("Delete failed — check RLS policy");
+    return;
   }
+
+  // 🔥 FORCE REFRESH EVERYTHING
+  await renderProductTable();
+  await loadSalesProducts();
+  refreshDashboard();
+}
+
+async function clearSalesDB() {
+
+  const confirmClear = confirm("⚠ Are you sure you want to delete all sales?");
+  if (!confirmClear) return;
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    alert("User not logged in");
+    return;
+  }
+
+  const { error } = await supabase
+    .from("sales")
+    .delete()
+    .eq("user_id", user.id);
+
+  if (error) {
+    console.error("Delete sales error:", error);
+    alert("❌ Failed to clear sales");
+    return;
+  }
+
+  alert("✅ All sales cleared");
+
+  // 🔥 refresh everything
+  refreshDashboard();
 }
 
 async function getSalesAnalytics(){
@@ -288,7 +317,7 @@ async function recordSaleFromForm(){
     return;
   }
 
-  const totalPrice = qty * (product.price || 0);
+  const totalPrice = qty * (product.price || 100); // fallback price
 
   // ✅ STEP 1: STOCK UPDATE
   const { error: updateError } = await supabaseClient
@@ -347,6 +376,7 @@ async function addProduct(){
   const category = document.getElementById("prod-category").value;
   const stock = parseInt(document.getElementById("prod-sales").value);
   const price = parseFloat(document.getElementById("prod-price")?.value || 0);
+  const date = document.getElementById("prod-date").value;
 
   if(!name || !category || !stock){
     showToast("Fill all fields","error");
@@ -359,7 +389,8 @@ async function addProduct(){
       product_name: name,
       category,
       stock,
-      price
+      price,
+      created_at: new Date(date).toISOString()
     }
   ]);
 
@@ -367,9 +398,11 @@ async function addProduct(){
 
   await renderProductTable();
   await loadSalesProducts();   // ✅ ADD THIS
+  await updateStatsCards();
   document.getElementById("prod-name").value = "";
   document.getElementById("prod-category").value = "";
   document.getElementById("prod-sales").value = "";
+  document.getElementById("prod-price").value = "";
 }
 
 /**
@@ -416,14 +449,35 @@ async function renderProductTable(){
   const sorted = [...products].sort((a, b)=> new Date(b.date)- new Date(a.date));
 
   tbody.innerHTML = sorted.map((p, i)=> `
-    <tr>
-      <td style="color:#94a3b8; font-weight:600;">${i + 1}</td>
-      <td style="font-weight:600; color:#0f172a;">${escapeHTML(p.name)}</td>
-      <td><span class="badge ${categoryColors[p.category] || 'badge-blue'}">${escapeHTML(p.category)}</span></td>
-      <td style="font-weight:700; color:#2563eb;">${p.stock.toLocaleString()}</td>
-      <td style="color:#64748b;">${formatDate(p.date)}</td>
-    </tr>
-  `).join('');
+  <tr>
+    <td style="color:#94a3b8; font-weight:600;">${i + 1}</td>
+
+    <td style="font-weight:600; color:#0f172a;">
+      ${escapeHTML(p.name)}
+    </td>
+
+    <td>
+      <span class="badge ${categoryColors[p.category] || 'badge-blue'}">
+        ${escapeHTML(p.category)}
+      </span>
+    </td>
+
+    <!-- ✅ STOCK -->
+    <td style="font-weight:700; color:#2563eb;">
+      ${p.stock}
+    </td>
+
+    <!-- ✅ PRICE -->
+    <td style="font-weight:700; color:#16a34a;">
+      ₹${new Intl.NumberFormat('en-IN').format(p.price)}
+    </td>
+
+    <!-- ✅ DATE -->
+    <td style="color:#64748b;">
+      ${formatDate(p.date)}
+    </td>
+  </tr>
+`).join('');
 }
 
 
@@ -438,7 +492,7 @@ async function loadSalesHistory(){
       quantity,
       total_price,
       sale_date,
-      products ( product_name )
+      products ( product_name, price )
     `)
     .eq("user_id", user.id)
     .order("sale_date", { ascending:false });
@@ -466,7 +520,7 @@ async function loadSalesHistory(){
       <td>${formatDate(s.sale_date)}</td>
       <td>${escapeHTML(s.products?.product_name)}</td>
       <td>${s.quantity}</td>
-      <td>₹${s.total_price}</td>
+      <td>₹${new Intl.NumberFormat('en-IN').format(s.total_price)}</td>
     </tr>
   `).join("");
 }
@@ -480,7 +534,6 @@ async function clearProducts(){
   await clearProductsDB();
 
   await renderProductTable();
-  await updateStatsCards();
   await updateInsights();
   await updateForecast();
 
@@ -597,6 +650,10 @@ function renderLineChart(canvasId, labels, data, label){
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      animation: {
+  	duration: 1200,
+  	easing: 'easeOutQuart'
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -659,6 +716,10 @@ function renderPieChart(canvasId, labels, data){
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      animation: {
+        duration: 1200,
+        easing: 'easeOutQuart'
+      },
       cutout: '60%',
       plugins: {
         legend: {
@@ -719,6 +780,10 @@ function renderBarChart(canvasId, labels, data){
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      animation: {
+        duration: 1200,
+        easing: 'easeOutQuart'
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -828,17 +893,22 @@ async function refreshCharts(){
   );
 }
 
-renderMonthlyChart();
 
 /** refreshDashboard()— Re-renders stats, charts, and insights */
-function refreshDashboard(){
-  updateStatsCards();
+async function refreshDashboard(){
+  await updateStatsCards();
   refreshCharts();
+
+  // Run lightweight updates only
   updateInsights();
   updateTopProducts();
   updateLowStock();
   updateRestockSuggestions();
-  loadAIInsights();
+
+  await renderMonthlyChart(); 
+  await loadAIInsights(); 
+
+  // Avoid repeated heavy calls
 }
 
 async function renderPredictionChart(){
@@ -941,6 +1011,7 @@ async function updateInsights(){
   document.getElementById("insight-top").textContent = topProduct || "—";
   document.getElementById("insight-growing").textContent = topCategory || "—";
   document.getElementById("insight-total-sales").textContent = total;
+  document.getElementById("insight-trending").textContent = topProduct || "—";
 }
 
 async function updateTopProducts(){
@@ -1157,78 +1228,95 @@ function renderForecastList(listId, products, label, emoji){
  */
 async function buildAIResponse(question){
 
-  const products = await getProducts();
-  const q = question.toLowerCase();
-
-  let data = {};
   try {
-     const res = await fetch("/api/ai",{
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ question, products })
-    });
-    data = await res.json();
-  } catch (e) {
-    console.warn("AI API not available, using fallback");
-  }
+    const products = await getProducts();
 
-  if(data.answer){
-    return data.answer;
-  }
-
-  // fallback local responses if AI fails
-
-  if (q.includes('total sales')){
-       const sales = await getSalesAnalytics();
-       const total = sales.reduce((s,x)=>s + x.quantity, 0);
-       return `💰 Total units sold: ${total}`;
-     }
-
-  if (q.includes('top') || q.includes('best')){
-    const sales = await getSalesAnalytics();
-
-       const map = {};
-       sales.forEach(s=>{
-          const name = s.products?.product_name;
-          map[name] = (map[name] || 0) + s.quantity;
-       });
-
-       const top = Object.entries(map).sort((a,b)=>b[1]-a[1])[0];
-
-       return top
-          ? `🏆 Top product: ${top[0]} (${top[1]} units sold)`
-          : "No sales data available.";
-     }
-
-  return "AI could not generate a response.";
-}
-async function loadAIInsights(){
-
-  const products = await getProducts();
-
-  if(products.length === 0){
-    document.getElementById("ai-insights").innerHTML =
-      "Add products to generate AI insights.";
-    return;
-  }
-
-  let data = {};
-  try {
-    const res = await fetch("/api/ai",{
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
+    const res = await fetch("http://localhost:3000/api/ai", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify({
-        question: "Give short business insights about my store",
+        question,
         products
       })
     });
-    data = await res.json();
-  } catch (e) {
-    data.answer = "Basic insights: Track top products and restock low items.";
+
+    let data;
+
+  try {
+      data = await res.json();
+    } catch (e) {
+       return "⚠ Invalid AI response";
+       return;
+    }
+
+    if (data.error) {
+      return "⚠ " + data.error;
+    }
+
+    return data.answer;
+
+  } catch (err) {
+    console.error("AI FRONTEND ERROR:", err);
+    return "⚠ Failed to connect to AI server";
+  }
+}
+
+async function loadAIInsights(){
+
+  const products = await getProducts();
+  const container = document.getElementById("ai-insights");
+
+  if(!container) return;
+
+  if(products.length === 0){
+    container.innerHTML = "📦 Add products to generate insights.";
+    return;
   }
 
-  document.getElementById("ai-insights").innerHTML = data.answer;
+  try {
+
+    container.innerHTML = "🤖 Generating AI insights...";
+
+    const res = await fetch("http://localhost:3000/api/ai", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        question: "Give overall business insights for my store",
+        products
+      })
+    });
+
+    let data;
+
+  try {
+       data = await res.json();
+     } catch (e) {
+        container.innerHTML = "⚠ AI response error";
+        return;
+     }
+
+    if (data.error) {
+      container.innerHTML = "⚠ " + data.error;
+      return;
+    }
+
+    container.innerHTML = `
+      <div style="white-space:pre-line;">
+        ${data.answer}
+      </div>
+    `;
+
+  } catch (err) {
+    console.error("AI Insights Error:", err);
+    container.innerHTML = "⚠ Failed to load AI insights";
+  }
 }
+
+
 
 /* --- Floating Chatbot Widget --- */
 
@@ -1347,13 +1435,17 @@ function showToast(message, type = 'success'){
 
 /** formatDate(dateStr)— Format 'YYYY-MM-DD' to 'Jan 1, 2025' */
 function formatDate(dateStr){
-  if (!dateStr)return '—';
-  try {
-    const d = new Date(dateStr + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  } catch {
-    return dateStr;
-  }
+  if (!dateStr) return "—";
+
+  const d = new Date(dateStr);
+
+  if (isNaN(d)) return "—";
+
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  });
 }
 
 /** escapeHTML(str)— Sanitize user input before inserting into DOM */
@@ -1366,37 +1458,50 @@ function escapeHTML(str){
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
-async function exportReport(){
-
-  const user = await getCurrentUser();
-
-  const { data: products } = await supabaseClient
-    .from("products")
-    .select("*")
-    .eq("user_id", user.id);
-
-  const { data: sales } = await supabaseClient
-    .from("sales")
-    .select("quantity, total_price, products(product_name)")
-    .eq("user_id", user.id);
-
-  if(!products || products.length === 0){
-    showToast("No data","error");
-    return;
-  }
-
+async function exportReport() {
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
+  const pdf = new jsPDF();
 
-  const totalUnits = (sales || []).reduce((s,x)=>s+x.quantity,0);
-  const totalRevenue = (sales || []).reduce((s,x)=>s+x.total_price,0);
+  const logo = new Image();
+  logo.src = "logo.png";
 
-  doc.text("RetailTrend Report",20,20);
-  doc.text(`Products: ${products.length}`,20,40);
-  doc.text(`Units Sold: ${totalUnits}`,20,50);
-  doc.text(`Revenue: $${totalRevenue}`,20,60);
+  logo.onload = async function () {
 
-  doc.save("report.pdf");
+    // 🎨 HEADER BACKGROUND
+    pdf.setFillColor(37, 99, 235);
+    pdf.rect(0, 0, 210, 30, "F");
+
+    // 🖼 LOGO
+    pdf.addImage(logo, "PNG", 160, 5, 40, 20);
+
+    // 📝 TITLE
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(18);
+    pdf.text("RetailTrend Report", 14, 18);
+
+    // 📅 DATE
+    pdf.setFontSize(10);
+    pdf.text("Generated: " + new Date().toLocaleString(), 14, 25);
+
+    // 📊 CONTENT
+    const content = document.querySelector(".page-content");
+
+    const canvas = await html2canvas(content, { scale: 2 });
+
+    const imgData = canvas.toDataURL("image/png");
+
+    const imgWidth = 190;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    pdf.addImage(imgData, "PNG", 10, 40, imgWidth, imgHeight);
+
+    // 📄 FOOTER
+    pdf.setTextColor(100);
+    pdf.setFontSize(10);
+    pdf.text("© RetailTrend | Smart Analytics", 60, 290);
+
+    pdf.save("RetailTrend_Report.pdf");
+  };
 }
 
 /* ============================================================
@@ -1418,6 +1523,7 @@ document.addEventListener('DOMContentLoaded', async function (){
   await loadSalesProducts();
      await loadSalesHistory();
   await updateStatsCards();
+  await calculateProfit();
   await updateLowStock();
      await updateRestockSuggestions();
   await updateInsights();
@@ -1453,11 +1559,7 @@ if (user?.id) {
         filter: `user_id=eq.${user.id}`
       },
       () => {
-        renderProductTable();
-        updateStatsCards();
-        refreshCharts();
-        updateInsights();
-        updateForecast();
+        refreshDashboard();
       }
     )
     .subscribe();
@@ -1481,3 +1583,54 @@ if (user?.id) {
     .subscribe();
 }
 });
+// 🌙 DARK MODE
+document.addEventListener("DOMContentLoaded", () => {
+
+  const toggleBtn = document.getElementById("theme-toggle");
+
+  if (localStorage.getItem("theme") === "dark") {
+    document.body.classList.add("dark");
+  }
+
+  toggleBtn?.addEventListener("click", () => {
+    document.body.classList.toggle("dark");
+
+    const mode = document.body.classList.contains("dark") ? "dark" : "light";
+    localStorage.setItem("theme", mode);
+  });
+
+});
+// ⏳ HIDE LOADER
+window.addEventListener("load", () => {
+  const loader = document.getElementById("loader");
+  if (loader) loader.style.display = "none";
+
+  document.body.style.display = "flex"; // show page
+});
+function setDefaultDate() {
+  const today = new Date().toISOString().split("T")[0];
+
+  ["prod-date", "sale-date"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.value) el.value = today;
+  });
+}
+async function calculateProfit(){
+
+  const sales = await getSalesAnalytics();
+
+  let revenue = 0;
+  let cost = 0;
+
+  sales.forEach(s => {
+    const price = s.products?.price || 0;
+
+    revenue += price * s.quantity;
+    cost += (price * 0.6) * s.quantity; // assume 60% cost
+  });
+
+  const profit = revenue - cost;
+
+  document.getElementById("stat-profit").textContent =
+    "₹" + new Intl.NumberFormat('en-IN').format(profit);
+}

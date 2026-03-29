@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 dotenv.config();
 
@@ -11,55 +11,83 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(".")); // serve frontend files
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+// ✅ Initialize Gemini
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// ✅ AI Route
 app.post("/api/ai", async (req, res) => {
-
   try {
-
     const { question, products } = req.body;
 
-    if(!question){
-      return res.json({ answer: "No question provided." });
+    // ✅ Validate input
+    if (!question) {
+      return res.status(400).json({
+        error: "No question provided"
+      });
     }
 
-    const prompt = `
-You are a retail analytics AI.
+    // ✅ Limit data (prevent overload)
+    const limitedProducts = (products || []).slice(0, 50);
 
-Store data:
-${JSON.stringify(products)}
+    // ✅ Prompt
+    const prompt = `
+You are a smart retail analytics AI.
+
+Analyze this store data:
+${JSON.stringify(limitedProducts)}
 
 User question:
 ${question}
 
-Give a short helpful business insight.
+Return response in this format:
+
+📊 Insight:
+...
+
+📈 Trend:
+...
+
+💡 Suggestion:
+...
 `;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role:"system", content:"You are a retail analytics assistant." },
-        { role:"user", content: prompt }
-      ]
+    // ✅ Gemini model
+    const model = genAI.getGenerativeModel({
+      model: "gemini-pro"
     });
 
-    const answer = response.choices[0].message.content;
+    const result = await model.generateContent(prompt);
 
-    res.json({ answer });
+    const answer = result.response.text();
+
+    // ✅ Send response
+    res.status(200).json({ answer });
 
   } catch (err) {
-
     console.error("AI ERROR:", err);
 
-    res.json({
-      answer: "⚠ AI service temporarily unavailable. Please try again."
+    // 🔥 Fallback (if AI fails)
+    const { products } = req.body || {};
+
+    let fallback = "⚠ AI unavailable. Showing basic insights.\n\n";
+
+    if (products && products.length > 0) {
+      const top = products[0]?.name || "your products";
+
+      fallback += `📊 Insight:\nTop product appears to be ${top}.\n\n`;
+      fallback += `📈 Trend:\nInventory-based analysis active.\n\n`;
+      fallback += `💡 Suggestion:\nFocus on restocking fast-moving items.`;
+    }
+
+    res.status(200).json({
+      answer: fallback
     });
-
   }
-
 });
-app.listen(3000, () => {
-  console.log("Server running on http://localhost:3000");
+
+// ✅ Server start
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
 });

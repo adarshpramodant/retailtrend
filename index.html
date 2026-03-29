@@ -121,7 +121,7 @@ body {
 </style>
 </head>
 
-<body>
+<body class="auth-page">
 
 <div class="container">
 
@@ -155,8 +155,9 @@ body {
 
       <h2>Get Started</h2>
 
-      <button onclick="loginWithGoogle()" class="google-btn">
-        Continue with Google
+      <button onclick="loginWithGoogle()" class="google-btn" rel="noopener">
+  	<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18">
+  	Continue with Google
       </button>
 
       <div id="login-msg" class="footer"></div>
@@ -174,11 +175,16 @@ body {
 <script>
 
 const supabaseUrl = "https://jxwsumcnvdzxipysyqtn.supabase.co";
-const supabaseKey = "YOUR_KEY_HERE";
+const supabaseKey = "sb_publishable_OtIyP7HLqu-lsMhgq5hzfw_bgzmtbQs";
 
 const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 async function loginWithGoogle() {
+
+  const btn = document.querySelector(".google-btn");
+  btn.innerText = "Redirecting...";
+  btn.disabled = true;
+
   const { error } = await supabaseClient.auth.signInWithOAuth({
     provider: "google",
     options: {
@@ -187,9 +193,12 @@ async function loginWithGoogle() {
   });
 
   if (error) {
-    document.getElementById("login-msg").innerText = error.message;
+    document.getElementById("login-msg").innerText = "⚠ " + error.message;
+    btn.innerText = "Continue with Google";
+    btn.disabled = false;
   }
 }
+
 
 async function checkSession() {
   const { data } = await supabaseClient.auth.getSession();
