@@ -25,6 +25,7 @@ const supabaseUrl = "https://jxwsumcnvdzxipysyqtn.supabase.co";   // replace if 
 const supabaseKey = "sb_publishable_OtIyP7HLqu-lsMhgq5hzfw_bgzmtbQs";  // copy from API Keys
 
 const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+const API_URL = "https://retailtrend.onrender.com/api/ai";
 /* ============================================================
    1. AUTH / SESSION GUARD
    Redirect to login page if no active session found
@@ -178,7 +179,7 @@ async function clearSalesDB() {
   const confirmClear = confirm("⚠ Are you sure you want to delete all sales?");
   if (!confirmClear) return;
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await supabaseClient.auth.getUser();
 
   if (!user) {
     alert("User not logged in");
@@ -1231,7 +1232,7 @@ async function buildAIResponse(question){
   try {
     const products = await getProducts();
 
-    const res = await fetch("https://retailtrend.onrender.com/api/ai", {
+    const res = await fetch("API_URL", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -1248,7 +1249,10 @@ async function buildAIResponse(question){
       data = await res.json();
     } catch (e) {
        return "⚠ Invalid AI response";
-       return;
+    }
+
+  if (!res.ok) {
+        return "⚠ AI server error";
     }
 
     if (data.error) {
@@ -1279,7 +1283,7 @@ async function loadAIInsights(){
 
     container.innerHTML = "🤖 Generating AI insights...";
 
-    const res = await fetch("https:retailtrend.onrender.com/api/ai", {
+    const res = await fetch("API_URL", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
