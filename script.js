@@ -1467,46 +1467,84 @@ async function exportReport() {
   const pdf = new jsPDF();
 
   const logo = new Image();
-  logo.src = "logo.png";
+  logo.src = "/logo.png";
 
   logo.onload = async function () {
 
-    // 🎨 HEADER BACKGROUND
+    // HEADER
     pdf.setFillColor(37, 99, 235);
     pdf.rect(0, 0, 210, 30, "F");
 
-    // 🖼 LOGO
     pdf.addImage(logo, "PNG", 160, 5, 40, 20);
 
-    // 📝 TITLE
     pdf.setTextColor(255, 255, 255);
     pdf.setFontSize(18);
-    pdf.text("RetailTrend Report", 14, 18);
+    pdf.text("RetailTrend Business Report", 14, 18);
 
-    // 📅 DATE
     pdf.setFontSize(10);
     pdf.text("Generated: " + new Date().toLocaleString(), 14, 25);
 
-    // 📊 CONTENT
-    const content = document.querySelector(".page-content");
+    // OVERVIEW
+    pdf.setTextColor(0);
+    pdf.setFontSize(14);
+    pdf.text("📊 Dashboard Overview", 14, 45);
 
-    const canvas = await html2canvas(content, { scale: 2 });
+    pdf.setFontSize(11);
 
-    const imgData = canvas.toDataURL("image/png");
+    const totalProducts = document.getElementById("total-products")?.innerText || "0";
+    const totalSales = document.getElementById("total-sales")?.innerText || "0";
+    const topProduct = document.getElementById("best-product")?.innerText || "N/A";
 
-    const imgWidth = 190;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    pdf.text(`Total Products: ${totalProducts}`, 14, 55);
+    pdf.text(`Total Sales: ${totalSales}`, 14, 62);
+    pdf.text(`Top Product: ${topProduct}`, 14, 69);
 
-    pdf.addImage(imgData, "PNG", 10, 40, imgWidth, imgHeight);
+    // CHART
+    pdf.text("📈 Sales Chart", 14, 85);
 
-    // 📄 FOOTER
-    pdf.setTextColor(100);
+    const chartCanvas = document.querySelector("canvas");
+    if (chartCanvas) {
+      const chartImg = chartCanvas.toDataURL("image/png");
+      pdf.addImage(chartImg, "PNG", 14, 90, 180, 80);
+    }
+
+    // NEW PAGE
+    pdf.addPage();
+
+    // TABLE
+    pdf.setFontSize(14);
+    pdf.text("📦 Product Details", 14, 20);
+
+    const { data: products } = await supabaseClient
+      .from("products")
+      .select("*");
+
+    const tableData = products.map(p => [
+      p.product_name,
+      p.category,
+      p.stock,
+      "₹" + p.price
+    ]);
+
+    pdf.autoTable({
+      startY: 30,
+      head: [["Product", "Category", "Stock", "Price"]],
+      body: tableData,
+      theme: "grid",
+      headStyles: {
+        fillColor: [37, 99, 235]
+      }
+    });
+
+    // FOOTER
+    pdf.setTextColor(120);
     pdf.setFontSize(10);
-    pdf.text("© RetailTrend | Smart Analytics", 60, 290);
+    pdf.text("© RetailTrend | Smart Analytics Platform", 50, 290);
 
-    pdf.save("RetailTrend_Report.pdf");
+    pdf.save("RetailTrend_Premium_Report.pdf");
   };
 }
+
 
 /* ============================================================
    12. BOOTSTRAP — Initialize the dashboard on page load
