@@ -1306,56 +1306,109 @@ async function buildAIResponse(question){
   }
 }
 
-async function loadAIInsights(){
+async function loadAIInsights() {
+  const container = document.getElementById("aiInsights");
 
-  const products = await getProducts();
-  const container = document.getElementById("ai-insights");
+  if (!container) return;
 
-  if(!container) return;
-
-  if(products.length === 0){
-    container.innerHTML = "📦 Add products to generate insights.";
-    return;
-  }
+  container.innerHTML = "⏳ Generating insights...";
 
   try {
+    // 🔹 Fetch your products (you already use Supabase)
+    const { data: products } = await supabaseClient
+      .from("products")
+      .select("*");
 
-    container.innerHTML = "🤖 Generating AI insights...";
-
+    // 🔹 Call your AI API
     const res = await fetch(API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        question: "Give overall business insights for my store",
+        question: "Analyze my store and give insights, trends, and suggestions",
         products
       })
     });
 
-    let data;
+    let data = {};
 
-  try {
-       data = await res.json();
-     } catch (e) {
-        container.innerHTML = "⚠ AI response error";
-        return;
-     }
+    try {
+      data = await res.json();
+      console.log("AI RESPONSE:", data); // 🔍 debug
+    } catch (e) {
+      console.error("AI JSON parse error", e);
+    }
 
-    if (data.error) {
-      container.innerHTML = "⚠ " + data.error;
+    const answer = data.answer || "";
+
+    // =========================
+    // ✅ CASE 1: REAL AI RESPONSE
+    // =========================
+    if (
+      answer &&
+      !answer.toLowerCase().includes("ai unavailable")
+    ) {
+      container.innerHTML = `
+        <div style="white-space:pre-line;">
+          ${answer}
+        </div>
+      `;
       return;
     }
 
+    // =========================
+    // 🔥 CASE 2: SMART FALLBACK (DYNAMIC)
+    // =========================
+
+    if (!products || products.length === 0) {
+      container.innerHTML = `
+        <p><b>Insight:</b> No products available.</p>
+        <p><b>Trend:</b> Store setup in progress.</p>
+        <p><b>Suggestion:</b> Add products to begin analysis.</p>
+      `;
+      return;
+    }
+
+    // 🔹 Calculate best product (basic logic)
+    const { data: sales } = await supabaseClient
+      .from("sales")
+      .select("*");
+
+    let topProduct = "Unknown";
+    let totalSales = 0;
+
+    if (sales && sales.length > 0) {
+      const map = {};
+
+      sales.forEach(s => {
+        map[s.product_id] = (map[s.product_id] || 0) + s.quantity;
+        totalSales += s.quantity;
+      });
+
+      const topId = Object.keys(map).reduce((a, b) =>
+        map[a] > map[b] ? a : b
+      );
+
+      const found = products.find(p => p.id == topId);
+      if (found) topProduct = found.product_name;
+    }
+
+    // 🔹 Render dynamic fallback
     container.innerHTML = `
-      <div style="white-space:pre-line;">
-        ${data.answer}
-      </div>
+      <p><b>Insight:</b> Top product is ${topProduct}.</p>
+      <p><b>Trend:</b> Total sales reached ${totalSales} units.</p>
+      <p><b>Suggestion:</b> Focus on restocking ${topProduct} and optimizing inventory.</p>
     `;
 
-  } catch (err) {
-    console.error("AI Insights Error:", err);
-    container.innerHTML = "⚠ Failed to load AI insights";
+  } catch (error) {
+    console.error("AI LOAD ERROR:", error);
+
+    container.innerHTML = `
+      <p><b>Insight:</b> Unable to fetch AI insights.</p>
+      <p><b>Trend:</b> System running in offline mode.</p>
+      <p><b>Suggestion:</b> Please try again later.</p>
+    `;
   }
 }
 
