@@ -153,26 +153,43 @@ async function loadSalesProducts(){
   ).join("");
 }
 
-async function clearProductsDB(){
-
+async function clearProductsDB() {
   const { data: { user } } = await supabaseClient.auth.getUser();
 
-  const { error } = await supabaseClient
+  if (!user) {
+    alert("User not logged in");
+    return;
+  }
+
+  // 🔥 STEP 1: DELETE SALES FIRST
+  const { error: salesError } = await supabaseClient
+    .from("sales")
+    .delete()
+    .eq("user_id", user.id);
+
+  if (salesError) {
+    console.error("Sales delete error:", salesError);
+    return;
+  }
+
+  // 🔥 STEP 2: DELETE PRODUCTS
+  const { error: productError } = await supabaseClient
     .from("products")
     .delete()
     .eq("user_id", user.id);
 
-  if (error){
-    console.error("DELETE ERROR:", error);
-    alert("Delete failed — check RLS policy");
+  if (productError) {
+    console.error("Product delete error:", productError);
     return;
   }
 
-  // 🔥 FORCE REFRESH EVERYTHING
+  console.log("All data cleared");
+
   await renderProductTable();
   await loadSalesProducts();
   refreshDashboard();
 }
+
 
 async function clearSalesDB() {
 
@@ -186,7 +203,7 @@ async function clearSalesDB() {
     return;
   }
 
-  const { error } = await supabase
+  const { error } = await supabaseClient
     .from("sales")
     .delete()
     .eq("user_id", user.id);
@@ -213,7 +230,7 @@ async function getSalesAnalytics(){
       quantity,
       total_price,
       sale_date,
-      products ( product_name, category )
+      products ( product_name, category, price )
     `)
     .eq("user_id", user.id);
 
@@ -481,6 +498,25 @@ async function renderProductTable(){
 `).join('');
 }
 
+async function renderProductPerformance() {
+  const sales = await getSalesAnalytics();
+
+  const map = {};
+
+  sales.forEach(s => {
+    const name = s.products?.product_name;
+    if (!name) return;
+
+    map[name] = (map[name] || 0) + s.quantity;
+  });
+
+  renderBarChart(
+    "productBarChart",   // make sure canvas id matches
+    Object.keys(map),
+    Object.values(map)
+  );
+}
+
 
 async function loadSalesHistory(){
 
@@ -624,14 +660,13 @@ const CHART_COLORS = [
  */
 function renderLineChart(canvasId, labels, data, label){
   const canvas = document.getElementById(canvasId);
-  if (!canvas)return;
+  if (!canvas) return;
 
-  // Destroy old chart if exists
-  if (chartInstances[canvasId]){
+  if (chartInstances[canvasId]) {
     chartInstances[canvasId].destroy();
   }
 
-  chartInstances[canvasId] = new Chart(canvas, {
+  const chart = new Chart(canvas, {
     type: 'line',
     data: {
       labels,
@@ -643,42 +678,22 @@ function renderLineChart(canvasId, labels, data, label){
         backgroundColor: 'rgba(37,99,235,0.08)',
         pointBackgroundColor: '#2563eb',
         pointRadius: 5,
-        pointHoverRadius: 7,
         tension: 0.4,
-        borderWidth: 2.5,
+        borderWidth: 2
       }]
     },
     options: {
       responsive: true,
-      maintainAspectRatio: false,
-      animation: {
-  	duration: 1200,
-  	easing: 'easeOutQuart'
-      },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: '#0f172a',
-          titleColor: '#fff',
-          bodyColor: '#94a3b8',
-          padding: 12,
-          cornerRadius: 8,
-        }
-      },
-      scales: {
-        x: {
-          grid: { display: false },
-          ticks: { color: '#94a3b8', font: { size: 11 } }
-        },
-        y: {
-          beginAtZero: true,
-          grid: { color: '#f1f5f9' },
-          ticks: { color: '#94a3b8', font: { size: 11 } }
-        }
-      }
+      maintainAspectRatio: false
     }
   });
+
+  chartInstances[canvasId] = chart;
+
+  // 🔥 IMPORTANT LINE (THIS FIXES PDF)
+  window[canvasId + "_instance"] = chart;
 }
+
 
 /**
  * renderPieChart(canvasId, labels, data)— Renders a doughnut/pie chart
@@ -816,20 +831,28 @@ async function renderMonthlyChart(){
 
   const sales = await getSalesAnalytics();
 
+  if (!sales || sales.length === 0) return;
+
   const map = {};
 
-  sales.forEach(s=>{
-    const month = s.sale_date.slice(0,7);
+  sales.forEach(s => {
+    const date = new Date(s.sale_date);
+    const month = date.toISOString().slice(0,7);
+
     map[month] = (map[month] || 0) + s.quantity;
   });
 
+  const labels = Object.keys(map).sort();
+  const data = labels.map(m => map[m]);
+
   renderLineChart(
     "monthlySalesChart",
-    Object.keys(map),
-    Object.values(map),
+    labels,
+    data,
     "Monthly Sales"
   );
 }
+
 
 async function renderCategoryGrowth(){
 
@@ -838,7 +861,7 @@ async function renderCategoryGrowth(){
   const map = {};
 
   sales.forEach(s=>{
-    const cat = s.products?.category;
+    const cat = s.products?.category || "Other";
     map[cat] = (map[cat] || 0) + s.quantity;
   });
 
@@ -876,7 +899,7 @@ async function refreshCharts(){
   // CATEGORY PIE
   const categoryMap = {};
   sales.forEach(s=>{
-    const cat = s.products?.category;
+    const cat = s.products?.category || "Other";
     categoryMap[cat] = (categoryMap[cat] || 0) + s.quantity;
   });
 
@@ -892,6 +915,9 @@ async function refreshCharts(){
     Object.keys(categoryMap),
     Object.values(categoryMap)
   );
+  await renderProductPerformance();
+  await renderCategoryGrowth();
+  await renderPredictionChart();
 }
 
 
@@ -930,7 +956,7 @@ sales.forEach(s=>{
   dateMap[d] = (dateMap[d] || 0) + s.quantity;
 });
 
-const labels = Object.keys(dateMap);
+const labels = Object.keys(dateMap).sort();
 const actual = Object.values(dateMap);
 
 // Moving average prediction
@@ -1118,10 +1144,23 @@ async function updateForecast(){
   const medium = [];
   const low = [];
 
-  Object.entries(map).forEach(([name, qty])=>{
-    if(qty >= 200) high.push({ name, qty });
-    else if(qty >= 50) medium.push({ name, qty });
-    else low.push({ name, qty });
+  const values = Object.values(map);
+
+  // Safety check (VERY IMPORTANT)
+  if (values.length === 0) return;
+
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+
+  // Avoid division by zero
+  const range = max - min || 1;
+
+  Object.entries(map).forEach(([name, qty]) => {
+    const ratio = (qty - min) / range;
+
+     if (ratio > 0.66) high.push({ name, qty });
+     else if (ratio > 0.33) medium.push({ name, qty });
+     else low.push({ name, qty });
   });
 
   // render lists
@@ -1466,85 +1505,170 @@ async function exportReport() {
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF();
 
-  const logo = new Image();
-  logo.src = "/logo.png";
+  let y = 20;
+  const pageWidth = 210;
 
-  logo.onload = async function () {
+  // wait for charts
+  await new Promise(resolve => setTimeout(resolve, 800));
 
-    // HEADER
-    pdf.setFillColor(37, 99, 235);
-    pdf.rect(0, 0, 210, 30, "F");
+  // ===== HEADER =====
+  pdf.setFillColor(30,136,229);
+  pdf.rect(0, 0, pageWidth, 25, "F");
 
-    pdf.addImage(logo, "PNG", 160, 5, 40, 20);
+  pdf.setTextColor(255,255,255);
+  pdf.setFontSize(20);
+  pdf.text("RetailTrend Analytics Report", 20, 15);
 
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(18);
-    pdf.text("RetailTrend Business Report", 14, 18);
+  pdf.setFontSize(10);
+  pdf.text(new Date().toLocaleString(), 150, 15);
+
+  pdf.setTextColor(0,0,0);
+
+  // ===== KPI =====
+  y = 35;
+
+  const totalProducts = document.getElementById("stat-total-products")?.innerText || "0";
+  const totalSales = document.getElementById("stat-total-sales")?.innerText || "0";
+  const bestProduct = document.getElementById("stat-best-product")?.innerText || "-";
+
+  function drawCard(x, y, title, value) {
+    pdf.setFillColor(245,245,245);
+    pdf.roundedRect(x, y, 80, 25, 3, 3, "F");
 
     pdf.setFontSize(10);
-    pdf.text("Generated: " + new Date().toLocaleString(), 14, 25);
+    pdf.text(title, x + 5, y + 8);
 
-    // OVERVIEW
-    pdf.setTextColor(0);
     pdf.setFontSize(14);
-    pdf.text("📊 Dashboard Overview", 14, 45);
+    pdf.text(String(value), x + 5, y + 18);
+  }
 
-    pdf.setFontSize(11);
+  drawCard(15, y, "Total Products", totalProducts);
+  drawCard(105, y, "Total Sales", totalSales);
 
-    const totalProducts = document.getElementById("total-products")?.innerText || "0";
-    const totalSales = document.getElementById("total-sales")?.innerText || "0";
-    const topProduct = document.getElementById("best-product")?.innerText || "N/A";
+  y += 30;
+  drawCard(15, y, "Top Product", bestProduct);
 
-    pdf.text(`Total Products: ${totalProducts}`, 14, 55);
-    pdf.text(`Total Sales: ${totalSales}`, 14, 62);
-    pdf.text(`Top Product: ${topProduct}`, 14, 69);
+  // ===== AI =====
+  y += 35;
 
-    // CHART
-    pdf.text("📈 Sales Chart", 14, 85);
+  pdf.setFontSize(14);
+  pdf.setTextColor(30,136,229);
+  pdf.text("AI Insights", 20, y);
 
-    const chartCanvas = document.querySelector("canvas");
-    if (chartCanvas) {
-      const chartImg = chartCanvas.toDataURL("image/png");
-      pdf.addImage(chartImg, "PNG", 14, 90, 180, 80);
+  pdf.setFillColor(240,240,240);
+  pdf.roundedRect(15, y + 5, 180, 30, 3, 3, "F");
+
+  const aiText = document.getElementById("ai-insights")?.innerText;
+
+  const finalAI = aiText && aiText.trim() !== ""
+    ? aiText
+    : `Top product is ${bestProduct}. Sales are steady. Improve low-demand products.`;
+
+  pdf.setFontSize(10);
+  pdf.text(pdf.splitTextToSize(finalAI, 170), 20, y + 12);
+
+  // ===== SALES CHART =====
+  y += 50;
+
+  pdf.setFontSize(14);
+  pdf.setTextColor(30,136,229);
+  pdf.text("Sales Trend", 20, y);
+
+  const chart1 = window["salesTrendChart_instance"];
+
+  if (chart1) {
+    const img = chart1.toBase64Image();
+    pdf.addImage(img, "PNG", 15, y + 5, 180, 60);
+  } else {
+    pdf.text("Chart not available", 20, y + 15);
+  }
+
+  // ===== MONTHLY =====
+  y += 65;
+
+  if (y > 250) {
+    pdf.addPage();
+    y = 20;
+  }
+
+  pdf.setFontSize(14);
+  pdf.setTextColor(30,136,229);
+  pdf.text("Monthly Sales Performance", 20, y);
+
+  const chart2 = window["monthlySalesChart_instance"];
+
+  if (chart2) {
+    const img2 = chart2.toBase64Image();
+    pdf.addImage(img2, "PNG", 15, y + 5, 180, 60);
+  } else {
+    pdf.text("Chart not available", 20, y + 15);
+  }
+
+  // ===== TABLE PAGE =====
+  pdf.addPage();
+  y = 20;
+
+  pdf.setFontSize(16);
+  pdf.setTextColor(30,136,229);
+  pdf.text("Product Inventory Report", 20, y);
+
+  y += 10;
+
+  pdf.setFillColor(30,136,229);
+  pdf.rect(15, y - 5, 180, 8, "F");
+
+  pdf.setTextColor(255,255,255);
+  pdf.text("Product", 20, y);
+  pdf.text("Category", 80, y);
+  pdf.text("Stock", 130, y);
+  pdf.text("Price", 160, y);
+
+  pdf.setTextColor(0,0,0);
+
+  const yStart = y - 5;
+  y += 8;
+
+  const { data: products } = await supabaseClient.from("products").select("*");
+
+  products?.forEach((p) => {
+
+    if (y > 280) {
+      pdf.addPage();
+      y = 20;
     }
 
-    // NEW PAGE
-    pdf.addPage();
+    pdf.rect(15, y - 5, 180, 8);
 
-    // TABLE
-    pdf.setFontSize(14);
-    pdf.text("📦 Product Details", 14, 20);
+    pdf.text(String(p.product_name), 20, y);
+    pdf.text(String(p.category || "Other"), 80, y);
+    pdf.text(String(p.stock || 0), 130, y);
+    pdf.text("Rs. " + (p.price || 0), 160, y);
 
-    const { data: products } = await supabaseClient
-      .from("products")
-      .select("*");
+    y += 8;
+  });
 
-    const tableData = products.map(p => [
-      p.product_name,
-      p.category,
-      p.stock,
-      "₹" + p.price
-    ]);
+  const yEnd = y;
 
-    pdf.autoTable({
-      startY: 30,
-      head: [["Product", "Category", "Stock", "Price"]],
-      body: tableData,
-      theme: "grid",
-      headStyles: {
-        fillColor: [37, 99, 235]
-      }
-    });
+  pdf.line(75, yStart, 75, yEnd);
+  pdf.line(125, yStart, 125, yEnd);
+  pdf.line(155, yStart, 155, yEnd);
 
-    // FOOTER
+  // ===== FOOTER =====
+  const pages = pdf.internal.getNumberOfPages();
+
+  for (let i = 1; i <= pages; i++) {
+    pdf.setPage(i);
+
+    pdf.line(15, 285, 195, 285);
+    pdf.setFontSize(9);
     pdf.setTextColor(120);
-    pdf.setFontSize(10);
-    pdf.text("© RetailTrend | Smart Analytics Platform", 50, 290);
 
-    pdf.save("RetailTrend_Premium_Report.pdf");
-  };
+    pdf.text(`Page ${i} of ${pages}`, 160, 292);
+    pdf.text("RetailTrend | Smart Analytics Platform", 20, 292);
+  }
+
+  pdf.save("RetailTrend_Final_Report.pdf");
 }
-
 
 /* ============================================================
    12. BOOTSTRAP — Initialize the dashboard on page load
